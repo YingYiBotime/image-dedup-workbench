@@ -1,4 +1,4 @@
-# Image Dedup Workbench (图像智能查重与对比工作台 v4.0.6)
+# Image Dedup Workbench (图像智能查重与对比工作台 v4.0.7)
 
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%20Qt-41CD52?style=flat-square&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
@@ -64,7 +64,7 @@ python app.py
 
 ## 免安装绿色版使用说明 (Portable Build)
 
-1. 双击运行 `dist_portable\图像智能查重工作台\图像智能查重工作台.exe`（或解压 `图像智能查重工作台_免安装绿色版_v4.0.6.zip`）；
+1. 双击运行 `dist_portable\图像智能查重工作台\图像智能查重工作台.exe`（或解压 `图像智能查重工作台_免安装绿色版_v4.0.7.zip`）；
 2. 目标电脑无需安装 Python 或任何依赖环境，双击即可直接使用。
 
 ---
