@@ -54,7 +54,7 @@ def _bootstrap_hotpatch():
     """启动时检查 %LOCALAPPDATA%\\TableclothDedupPro\\hotpatch 下是否有更新的云端热补丁并无缝接管"""
     if getattr(sys, "_tdpro_hotpatch_bootstrapped", False):
         return
-    builtin_version = "4.0.5"
+    builtin_version = "4.0.6"
     local_base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~\\AppData\\Local")
     hp_dir = os.path.join(local_base, "TableclothDedupPro", "hotpatch")
     hp_manifest = os.path.join(hp_dir, "hotpatch_manifest.json")
@@ -2453,7 +2453,7 @@ class DedupMainWindow(QMainWindow):
         self._sync_zoom_enabled: bool = True
         self._view_mode: str = "dual"  # "dual" | "heatmap" | "curtain"
 
-        self.setWindowTitle("图像智能查重工作台 v4.0")
+        self.setWindowTitle(f"图像智能查重工作台 v{APP_VERSION}")
         self.resize(1480, 900)
         self.setMinimumSize(1160, 720)
         self.setAcceptDrops(True)
