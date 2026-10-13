@@ -54,7 +54,7 @@ def _bootstrap_hotpatch():
     """启动时检查 %LOCALAPPDATA%\\TableclothDedupPro\\hotpatch 下是否有更新的云端热补丁并无缝接管"""
     if getattr(sys, "_tdpro_hotpatch_bootstrapped", False):
         return
-    builtin_version = "4.0.4"
+    builtin_version = "4.0.5"
     local_base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~\\AppData\\Local")
     hp_dir = os.path.join(local_base, "TableclothDedupPro", "hotpatch")
     hp_manifest = os.path.join(hp_dir, "hotpatch_manifest.json")
