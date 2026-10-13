@@ -1,15 +1,15 @@
 {
-  "version": "4.0.6",
-  "published_at": "2026-10-13 15:16:07",
+  "version": "4.0.7",
+  "published_at": "2026-10-13 16:57:24",
   "hotpatch_files": {
-    "app.py": "475a21542b1612e6f07d87d836a2c925407f45a76574698e32535abd5091873a",
+    "app.py": "59a94b9e55c52315d4a1b5523c52a321d069fda0f2a867b458c43f8581be569a",
     "engine.py": "9d53f9681d146e2da83104497fbf8268738881d5861dbf992e12aac40f9dc77e",
-    "core_infra.py": "5f3e0df87cd20137f4b491311400fc10bf957916777bcb0580a092781ce86544",
+    "core_infra.py": "90921be38d9c3e26294d30425f35f79ed46db851e344bff591fb44dc98dfa1e7",
     "generate_icon.py": "78f74c68853a8f57856f45c1e4f759c33d60e060336a80655c09f105c104bb35",
     "github_ota_config.json": "1dd58c6aae5ebb6933471858809869312d77d4d064f7f428820f5ea1410b2dab"
   },
-  "hotpatch_size_kb": 294.7,
-  "hotpatch_sha256": "1d63e425e87ed725da229e36fc57ddc143ce17f59f8f604959049399dc51b45b",
-  "hotpatch_rsa_sig": "p-fkwW1L3MmTp6iFVLoJl3xd0cmW4g5tq7_cHIHYjqIRDKPu1Jr_DFpIEubzf_ujx8NCNQh0kVwu7hzih6t8gycRtHGGVOTgYFJdyChHZQxWK_Sst4nZ37USO8dBtvy0DSjaJLRZ6QZ3DZFge4hBUdNeVPtRn8ntnAQWjhoTk7WY9MSByMJxiVb5ywnhPTX_CKLHS35t8J5Z0gguVLazPDumfhkTR61VGsbjOlyaj6OIj-fzk6q23FKIRfqIdTBcickY8Jc0O6PvicdBbtujdhIlAlxaLGJLc0DrjBM7IrLpTdcYd-58Kxc_btIk678zRBw2hosLLHCj-HaJ6ZJshA",
-  "notes": "1. 修复主窗口顶部系统标题栏版本号同步显示（随版本更新动态显示 v4.0.6）；\n2. 升级为标准商业软件更新体验：检测到新版本时弹窗询问是否更新，点击【立即更新】后在电脑上全自动完成升级并重启；\n3. 内置【使用指南与常见问题帮助中心 (F1)】，详解白名单功能与已删图片暂存区找回方法。"
+  "hotpatch_size_kb": 306.5,
+  "hotpatch_sha256": "620de0acaf7f7e9073371f70174a5f0c22b6fd7d60d54154931dcc34d6545284",
+  "hotpatch_rsa_sig": "c95JdJISk5u9uYiRsojRLmB7KKsSGSdbKNWouSaD4-4bWtOlzaX1xkazwMukh5MD2vXYuni0QBq71crEUdaiPeNHgWOPHAWdApryxXl_ZRoPPRfYWSIEtQIXsuhWTeahgX6xqF_cjaaLA1U5cnzm8L-qVokwkWW9S3U_9py--ffSw_Q-pv0vKAXSAeh8mBDuzHJtY0TgJLYEfjSSOJuGo-LGtaZP54AXOL5VROy7-mJc6H3FtYl54bm2O3PvlkkVHhZCnnrMUwi9D3Xzu0oVf0BTq-SDPkBR3UawKF_aOu6KhY8eLZ8FKo6dZ8MggEGKLhAmYrOUpp9rWrZ43KyQkQ",
+  "notes": "优化滚动条拉杆手感；多图同款支持双视口候选切换与2列网格平铺，消除横向拉杆"
 }

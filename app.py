@@ -54,7 +54,7 @@ def _bootstrap_hotpatch():
     """启动时检查 %LOCALAPPDATA%\\TableclothDedupPro\\hotpatch 下是否有更新的云端热补丁并无缝接管"""
     if getattr(sys, "_tdpro_hotpatch_bootstrapped", False):
         return
-    builtin_version = "4.0.6"
+    builtin_version = "4.0.7"
     local_base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~\\AppData\\Local")
     hp_dir = os.path.join(local_base, "TableclothDedupPro", "hotpatch")
     hp_manifest = os.path.join(hp_dir, "hotpatch_manifest.json")
@@ -102,7 +102,8 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QLineEdit, QComboBox, QListWidget, QListWidgetItem,
     QFileDialog, QMessageBox, QProgressBar, QFrame, QScrollArea,
     QMenu, QToolButton, QStackedWidget, QSizePolicy, QWidgetAction,
-    QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QDialog, QTextBrowser
+    QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QDialog, QTextBrowser,
+    QAbstractItemView, QGridLayout
 )
 
 from engine import (
@@ -219,6 +220,15 @@ class LucideIcon:
             p.drawRoundedRect(QRectF(m, m + w * 0.08, w, w * 0.84), 2.0, 2.0)
             p.drawLine(QPointF(s * 0.5, m), QPointF(s * 0.5, m + w))
             p.drawLine(QPointF(s * 0.36, s * 0.5), QPointF(s * 0.64, s * 0.5))
+
+        elif name == "grid":
+            # 2x2 网格平铺图标
+            gap = w * 0.14
+            cw = (w - gap) * 0.5
+            p.drawRoundedRect(QRectF(m, m, cw, cw), 1.5, 1.5)
+            p.drawRoundedRect(QRectF(m + cw + gap, m, cw, cw), 1.5, 1.5)
+            p.drawRoundedRect(QRectF(m, m + cw + gap, cw, cw), 1.5, 1.5)
+            p.drawRoundedRect(QRectF(m + cw + gap, m + cw + gap, cw, cw), 1.5, 1.5)
 
         elif name == "check":
             p.drawLine(QPointF(m + w * 0.12, s * 0.54), QPointF(m + w * 0.40, m + w * 0.82))
@@ -2040,12 +2050,25 @@ class ViewportUnit(QFrame):
     keepRequested = Signal(object)
     deleteRequested = Signal(object)
     locateRequested = Signal(object)
+    candidateSelected = Signal(int)
 
-    def __init__(self, index_in_group: int, item: ImageItem, is_recommended: bool, parent=None):
+    def __init__(
+        self,
+        index_in_group: int,
+        item: ImageItem,
+        is_recommended: bool,
+        parent=None,
+        candidates: Optional[List[Tuple[int, ImageItem]]] = None,
+        current_candidate_idx: int = -1,
+        display_key_num: int = -1
+    ):
         super().__init__(parent)
         self.index_in_group = index_in_group
         self.item = item
         self.is_recommended = is_recommended
+        self.candidates = candidates or []
+        self.current_candidate_idx = current_candidate_idx
+        self.display_key_num = display_key_num
         self.setObjectName("ViewportUnit")
         self._build_ui()
 
@@ -2087,6 +2110,48 @@ class ViewportUnit(QFrame):
                 "padding: 1px 6px; border-radius: 4px;"
             )
             hdr.addWidget(lbl_rec)
+
+        # 多候选图切换胶囊按钮组
+        if self.candidates and len(self.candidates) > 1:
+            lbl_cand_tip = QLabel("切换副本:")
+            lbl_cand_tip.setStyleSheet("color: #71717a; font-size: 11px; margin-left: 2px; border: none;")
+            hdr.addWidget(lbl_cand_tip)
+            for c_idx, c_item in self.candidates:
+                c_code = chr(ord("A") + c_idx)
+                btn_c = QPushButton(f"图 {c_code}")
+                btn_c.setFixedHeight(22)
+                btn_c.setCursor(Qt.PointingHandCursor)
+                btn_c.setToolTip(f"切换对比图 ({c_code}): {c_item.filename} [{c_item.folder_tag}]")
+                if c_idx == self.current_candidate_idx:
+                    btn_c.setStyleSheet("""
+                        QPushButton {
+                            background-color: #2563eb;
+                            color: #ffffff;
+                            font-size: 11px;
+                            font-weight: 600;
+                            padding: 0 8px;
+                            border: 1px solid #3b82f6;
+                            border-radius: 4px;
+                        }
+                    """)
+                else:
+                    btn_c.setStyleSheet("""
+                        QPushButton {
+                            background-color: #27272a;
+                            color: #a1a1aa;
+                            font-size: 11px;
+                            font-weight: 500;
+                            padding: 0 8px;
+                            border: 1px solid rgba(255, 255, 255, 0.08);
+                            border-radius: 4px;
+                        }
+                        QPushButton:hover {
+                            background-color: #3f3f46;
+                            color: #f4f4f5;
+                        }
+                    """)
+                btn_c.clicked.connect(lambda _, ci=c_idx: self.candidateSelected.emit(ci))
+                hdr.addWidget(btn_c)
 
         hdr.addStretch(1)
 
@@ -2134,7 +2199,7 @@ class ViewportUnit(QFrame):
         act_row.setContentsMargins(0, 2, 0, 0)
         act_row.setSpacing(8)
 
-        key_num = self.index_in_group + 1
+        key_num = self.display_key_num if self.display_key_num > 0 else (self.index_in_group + 1)
         self.btn_keep = QPushButton(f" 保留 ({key_num})")
         self.btn_keep.setIcon(LucideIcon.icon("check", 14, "#10b981" if self.is_recommended else "#a1a1aa"))
         self.btn_keep.setFixedHeight(34)
@@ -2252,7 +2317,7 @@ class AttributeInspectorPanel(QFrame):
         self.main_layout.addWidget(self.content_widget)
         self.main_layout.addStretch(1)
 
-    def update_group(self, group: Optional[MatchGroup]):
+    def update_group(self, group: Optional[MatchGroup], item_a: Optional[ImageItem] = None, item_b: Optional[ImageItem] = None):
         while self.content_layout.count():
             child = self.content_layout.takeAt(0)
             if child.widget():
@@ -2263,10 +2328,14 @@ class AttributeInspectorPanel(QFrame):
 
         active = group.active_items
         items = active if len(active) >= 2 else group.items
-        if len(items) < 2:
+        if len(items) < 2 and item_b is None:
             return
 
-        a, b = items[0], items[1]
+        a = item_a if item_a is not None else items[0]
+        b = item_b if item_b is not None else (items[1] if len(items) > 1 else items[0])
+
+        code_a = chr(ord("A") + group.items.index(a)) if a in group.items else "A"
+        code_b = chr(ord("A") + group.items.index(b)) if b in group.items else "B"
 
         # 1. 智能预选判别结论卡片
         verdict_box = QFrame()
@@ -2286,20 +2355,28 @@ class AttributeInspectorPanel(QFrame):
         v_layout.addWidget(lbl_v_title)
 
         if a.pixel_count > b.pixel_count:
-            reason = "系统预选保留 图 A（分辨率更高）"
+            reason = f"系统预选保留 图 {code_a}（分辨率更高）"
         elif b.pixel_count > a.pixel_count:
-            reason = "系统预选保留 图 B（分辨率更高）"
+            reason = f"系统预选保留 图 {code_b}（分辨率更高）"
         elif a.filesize > b.filesize:
-            reason = "系统预选保留 图 A（文件体积更大）"
+            reason = f"系统预选保留 图 {code_a}（文件体积更大）"
         elif b.filesize > a.filesize:
-            reason = "系统预选保留 图 B（文件体积更大）"
+            reason = f"系统预选保留 图 {code_b}（文件体积更大）"
         else:
-            reason = "两图规格一致，默认预选保留 图 A"
+            reason = f"两图规格一致，推荐保留 图 {code_a}"
 
         lbl_v_sub = QLabel(reason)
         lbl_v_sub.setWordWrap(True)
         lbl_v_sub.setStyleSheet("color: #10b981; font-size: 11px; border: none;")
         v_layout.addWidget(lbl_v_sub)
+
+        # 多图提示
+        if len(group.items) > 2:
+            tip_multi = QLabel(f"本组包含 {len(group.items)} 张同款图片\n可在顶部切换对比或按 Delete 一键清理其余副本")
+            tip_multi.setWordWrap(True)
+            tip_multi.setStyleSheet("color: #60a5fa; font-size: 11px; border: none; padding-top: 4px;")
+            v_layout.addWidget(tip_multi)
+
         self.content_layout.addWidget(verdict_box)
 
         # 2. 逐项属性垂直对比（自动高亮不一致项）
@@ -2354,12 +2431,12 @@ class AttributeInspectorPanel(QFrame):
             elif mode == "diff_warn" and is_diff:
                 col_a, col_b = "#f59e0b", "#f59e0b"
 
-            lbl_va = QLabel(f"A: {val_a}")
+            lbl_va = QLabel(f"{code_a}: {val_a}")
             lbl_va.setWordWrap(True)
             lbl_va.setStyleSheet(f"color: {col_a}; font-size: 11px; font-weight: 500; border: none;")
             b_lay.addWidget(lbl_va)
 
-            lbl_vb = QLabel(f"B: {val_b}")
+            lbl_vb = QLabel(f"{code_b}: {val_b}")
             lbl_vb.setWordWrap(True)
             lbl_vb.setStyleSheet(f"color: {col_b}; font-size: 11px; font-weight: 500; border: none;")
             b_lay.addWidget(lbl_vb)
@@ -2444,6 +2521,7 @@ class DedupMainWindow(QMainWindow):
         self.filtered_groups: List[MatchGroup] = []
         self.current_group: Optional[MatchGroup] = None
         self.current_units: List[ViewportUnit] = []
+        self.current_candidate_idx: int = 1
         self.worker: Optional[ScanWorker] = None
 
         self._folder1_path: str = ""
@@ -2536,14 +2614,46 @@ class DedupMainWindow(QMainWindow):
                 background-color: #2563eb;
                 color: #ffffff;
             }
-            QScrollBar:vertical, QScrollBar:horizontal {
-                background: transparent;
-                width: 6px;
-                height: 6px;
+            QScrollBar:vertical {
+                background-color: #18181b;
+                width: 12px;
+                margin: 0px;
+                border-radius: 6px;
             }
-            QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
-                background: #27272a;
-                border-radius: 3px;
+            QScrollBar:horizontal {
+                background-color: #18181b;
+                height: 12px;
+                margin: 0px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #52525b;
+                min-height: 36px;
+                border-radius: 5px;
+                margin: 2px;
+            }
+            QScrollBar::handle:horizontal {
+                background-color: #52525b;
+                min-width: 36px;
+                border-radius: 5px;
+                margin: 2px;
+            }
+            QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {
+                background-color: #71717a;
+            }
+            QScrollBar::handle:vertical:pressed, QScrollBar::handle:horizontal:pressed {
+                background-color: #3b82f6;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                width: 0px;
+                height: 0px;
+                background: none;
+                border: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical,
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+                background: none;
             }
             QToolTip {
                 background-color: #202023;
@@ -3166,6 +3276,8 @@ class DedupMainWindow(QMainWindow):
 
         # 垂直重复图片组列表
         self.list_groups = QListWidget()
+        self.list_groups.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.list_groups.verticalScrollBar().setSingleStep(24)
         self.list_groups.currentRowChanged.connect(self._on_group_selected)
         ld_layout.addWidget(self.list_groups, stretch=1)
 
@@ -3232,6 +3344,18 @@ class DedupMainWindow(QMainWindow):
         self.btn_cap_curtain.toggled.connect(self._on_curtain_toggled)
         cap_layout.addWidget(self.btn_cap_curtain)
 
+        # [网格平铺 (多图时显示)]
+        self.btn_cap_grid = QPushButton(" 网格平铺")
+        self.btn_cap_grid.setIcon(LucideIcon.icon("grid", 14, "#d4d4d8"))
+        self.btn_cap_grid.setFixedHeight(28)
+        self.btn_cap_grid.setCheckable(True)
+        self.btn_cap_grid.setChecked(False)
+        self.btn_cap_grid.setCursor(Qt.PointingHandCursor)
+        self.btn_cap_grid.setToolTip("组内有 3 张以上图片时，切换为 2 列网格平铺浏览")
+        self.btn_cap_grid.toggled.connect(self._on_grid_toggled)
+        self.btn_cap_grid.setVisible(False)
+        cap_layout.addWidget(self.btn_cap_grid)
+
         # 分隔竖线
         sep = QFrame()
         sep.setFixedSize(1, 16)
@@ -3261,15 +3385,17 @@ class DedupMainWindow(QMainWindow):
         capsule_row.addStretch(1)
         cs_layout.addLayout(capsule_row)
 
-        # 双视口画布承载区
+        # 双视口画布承载区 (永久关闭横向滚动条，杜绝底部横向拉杆)
         self.viewport_scroll = QScrollArea()
         self.viewport_scroll.setWidgetResizable(True)
         self.viewport_scroll.setFrameShape(QFrame.NoFrame)
         self.viewport_scroll.setStyleSheet("background: transparent; border: none;")
+        self.viewport_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.viewport_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         self.viewport_container = QWidget()
         self.viewport_container.setStyleSheet("background: transparent;")
-        self.viewport_layout = QHBoxLayout(self.viewport_container)
+        self.viewport_layout = QGridLayout(self.viewport_container)
         self.viewport_layout.setContentsMargins(0, 0, 0, 0)
         self.viewport_layout.setSpacing(12)
 
@@ -3326,6 +3452,9 @@ class DedupMainWindow(QMainWindow):
 
         self.btn_cap_curtain.setStyleSheet(active_pill if self.btn_cap_curtain.isChecked() else idle_pill)
         self.btn_cap_curtain.setIcon(LucideIcon.icon("columns", 14, "#ffffff" if self.btn_cap_curtain.isChecked() else "#a1a1aa"))
+
+        self.btn_cap_grid.setStyleSheet(active_pill if self.btn_cap_grid.isChecked() else idle_pill)
+        self.btn_cap_grid.setIcon(LucideIcon.icon("grid", 14, "#ffffff" if self.btn_cap_grid.isChecked() else "#a1a1aa"))
 
     # ==================== 阶段切换与交互逻辑 ====================
 
@@ -3594,9 +3723,13 @@ class DedupMainWindow(QMainWindow):
     def _on_group_selected(self, row: int):
         if 0 <= row < len(self.filtered_groups):
             self.current_group = self.filtered_groups[row]
-            self.right_inspector.update_group(self.current_group)
+            self.current_candidate_idx = 1
             self._render_current_group()
             self._update_dock_progress()
+
+    def _on_candidate_selected(self, cand_idx: int):
+        self.current_candidate_idx = cand_idx
+        self._render_current_group()
 
     def _update_dock_progress(self):
         total = len(self.filtered_groups)
@@ -3616,18 +3749,41 @@ class DedupMainWindow(QMainWindow):
         self._refresh_capsule_styles()
 
     def _on_heatmap_toggled(self, checked: bool):
-        if checked and self.btn_cap_curtain.isChecked():
-            self.btn_cap_curtain.blockSignals(True)
-            self.btn_cap_curtain.setChecked(False)
-            self.btn_cap_curtain.blockSignals(False)
+        if checked:
+            if self.btn_cap_curtain.isChecked():
+                self.btn_cap_curtain.blockSignals(True)
+                self.btn_cap_curtain.setChecked(False)
+                self.btn_cap_curtain.blockSignals(False)
+            if self.btn_cap_grid.isChecked():
+                self.btn_cap_grid.blockSignals(True)
+                self.btn_cap_grid.setChecked(False)
+                self.btn_cap_grid.blockSignals(False)
         self._refresh_capsule_styles()
         self._render_current_group()
 
     def _on_curtain_toggled(self, checked: bool):
-        if checked and self.btn_cap_heatmap.isChecked():
-            self.btn_cap_heatmap.blockSignals(True)
-            self.btn_cap_heatmap.setChecked(False)
-            self.btn_cap_heatmap.blockSignals(False)
+        if checked:
+            if self.btn_cap_heatmap.isChecked():
+                self.btn_cap_heatmap.blockSignals(True)
+                self.btn_cap_heatmap.setChecked(False)
+                self.btn_cap_heatmap.blockSignals(False)
+            if self.btn_cap_grid.isChecked():
+                self.btn_cap_grid.blockSignals(True)
+                self.btn_cap_grid.setChecked(False)
+                self.btn_cap_grid.blockSignals(False)
+        self._refresh_capsule_styles()
+        self._render_current_group()
+
+    def _on_grid_toggled(self, checked: bool):
+        if checked:
+            if self.btn_cap_curtain.isChecked():
+                self.btn_cap_curtain.blockSignals(True)
+                self.btn_cap_curtain.setChecked(False)
+                self.btn_cap_curtain.blockSignals(False)
+            if self.btn_cap_heatmap.isChecked():
+                self.btn_cap_heatmap.blockSignals(True)
+                self.btn_cap_heatmap.setChecked(False)
+                self.btn_cap_heatmap.blockSignals(False)
         self._refresh_capsule_styles()
         self._render_current_group()
 
@@ -3640,32 +3796,111 @@ class DedupMainWindow(QMainWindow):
         self.btn_cap_whitelist.setText(" 移出白名单 (Space)" if grp.whitelisted else " 白名单 (Space)")
 
         active = grp.active_items
-        best_item = max(active, key=lambda it: (it.pixel_count, it.filesize)) if active else None
+        if not active:
+            active = grp.items
 
-        # 滑动卷帘对比模式
+        best_item = max(active, key=lambda it: (it.pixel_count, it.filesize)) if active else (grp.items[0] if grp.items else None)
+
+        has_multi = len(grp.items) > 2
+        self.btn_cap_grid.setVisible(has_multi)
+
+        # 候选项列表：除推荐项之外的其他所有图片
+        candidates = [(i, it) for i, it in enumerate(grp.items) if best_item is None or it.unique_key != best_item.unique_key]
+        candidate_indices = [i for i, _ in candidates]
+
+        if not candidate_indices:
+            candidate_indices = [1] if len(grp.items) > 1 else [0]
+
+        if self.current_candidate_idx not in candidate_indices:
+            self.current_candidate_idx = candidate_indices[0]
+
+        cand_idx = self.current_candidate_idx
+        cand_item = grp.items[cand_idx] if cand_idx < len(grp.items) else (grp.items[1] if len(grp.items) > 1 else grp.items[0])
+        ref_item = best_item if best_item else grp.items[0]
+
+        # 1. 滑动卷帘对比模式 (精准比对 基准原图 vs 当前选中对比图)
         if self.btn_cap_curtain.isChecked() and len(active) >= 2:
-            pix_a = load_qpixmap_safe(active[0].filepath)
-            pix_b = load_qpixmap_safe(active[1].filepath)
-            curtain = CurtainCompareWidget(pix_a, pix_b, active[0].filename, active[1].filename)
-            self.viewport_layout.addWidget(curtain, stretch=1)
+            pix_a = load_qpixmap_safe(ref_item.filepath)
+            pix_b = load_qpixmap_safe(cand_item.filepath)
+            curtain = CurtainCompareWidget(pix_a, pix_b, ref_item.filename, cand_item.filename)
+            self.viewport_layout.addWidget(curtain, 0, 0, 1, 2)
+            self.right_inspector.update_group(grp, item_a=ref_item, item_b=cand_item)
             return
 
-        # 标准双视口并排展示
-        for idx, item in enumerate(grp.items):
-            is_rec = (best_item is not None and item.unique_key == best_item.unique_key)
-            unit = ViewportUnit(index_in_group=idx, item=item, is_recommended=is_rec, parent=self.viewport_container)
-            unit.keepRequested.connect(self._on_keep_only_item)
-            unit.deleteRequested.connect(self._on_delete_single_item)
-            unit.locateRequested.connect(self._on_locate_item)
-            unit.canvas.viewChanged.connect(
-                lambda z, hr, vr, src=unit: self._on_canvas_view_changed(src, z, hr, vr)
-            )
-            self.current_units.append(unit)
-            self.viewport_layout.addWidget(unit, stretch=1)
+        # 2. 网格平铺模式 (用户主动勾选平铺 且 组内图片 > 2)
+        if self.btn_cap_grid.isChecked() and has_multi:
+            for idx, item in enumerate(grp.items):
+                is_rec = (best_item is not None and item.unique_key == best_item.unique_key)
+                unit = ViewportUnit(
+                    index_in_group=idx,
+                    item=item,
+                    is_recommended=is_rec,
+                    parent=self.viewport_container,
+                    display_key_num=idx + 1
+                )
+                unit.keepRequested.connect(self._on_keep_only_item)
+                unit.deleteRequested.connect(self._on_delete_single_item)
+                unit.locateRequested.connect(self._on_locate_item)
+                unit.canvas.viewChanged.connect(
+                    lambda z, hr, vr, src=unit: self._on_canvas_view_changed(src, z, hr, vr)
+                )
+                self.current_units.append(unit)
+                row = idx // 2
+                col = idx % 2
+                self.viewport_layout.addWidget(unit, row, col)
 
-        # 像素差异热图叠加视口
+            self.viewport_layout.setColumnStretch(0, 1)
+            self.viewport_layout.setColumnStretch(1, 1)
+            self.right_inspector.update_group(grp, item_a=ref_item, item_b=cand_item)
+            return
+
+        # 3. 标准双视口聚焦对比模式 (默认：左侧原始推荐原图 vs 右侧当前选中的对比图)
+        ref_idx = grp.items.index(ref_item) if ref_item in grp.items else 0
+        unit_a = ViewportUnit(
+            index_in_group=ref_idx,
+            item=ref_item,
+            is_recommended=True,
+            parent=self.viewport_container,
+            display_key_num=1
+        )
+        unit_a.keepRequested.connect(self._on_keep_only_item)
+        unit_a.deleteRequested.connect(self._on_delete_single_item)
+        unit_a.locateRequested.connect(self._on_locate_item)
+        unit_a.canvas.viewChanged.connect(
+            lambda z, hr, vr, src=unit_a: self._on_canvas_view_changed(src, z, hr, vr)
+        )
+        self.current_units.append(unit_a)
+        self.viewport_layout.addWidget(unit_a, 0, 0)
+
+        if len(grp.items) > 1:
+            unit_b = ViewportUnit(
+                index_in_group=cand_idx,
+                item=cand_item,
+                is_recommended=False,
+                parent=self.viewport_container,
+                candidates=candidates if len(candidates) > 1 else None,
+                current_candidate_idx=cand_idx,
+                display_key_num=2
+            )
+            unit_b.keepRequested.connect(self._on_keep_only_item)
+            unit_b.deleteRequested.connect(self._on_delete_single_item)
+            unit_b.locateRequested.connect(self._on_locate_item)
+            unit_b.candidateSelected.connect(self._on_candidate_selected)
+            unit_b.canvas.viewChanged.connect(
+                lambda z, hr, vr, src=unit_b: self._on_canvas_view_changed(src, z, hr, vr)
+            )
+            self.current_units.append(unit_b)
+            self.viewport_layout.addWidget(unit_b, 0, 1)
+            self.right_inspector.update_group(grp, item_a=ref_item, item_b=cand_item)
+        else:
+            self.right_inspector.update_group(grp, item_a=ref_item, item_b=None)
+
+        self.viewport_layout.setColumnStretch(0, 1)
+        self.viewport_layout.setColumnStretch(1, 1)
+
+        # 4. 像素差异热图叠加 (作用于 ref_item vs cand_item)
         if self.btn_cap_heatmap.isChecked() and len(active) >= 2:
-            diff_bgr = compute_diff_visualization(active[0].filepath, active[1].filepath)
+            diff_bgr = compute_diff_visualization(ref_item.filepath, cand_item.filepath)
             if diff_bgr is not None:
                 heat_frame = QFrame()
                 heat_frame.setStyleSheet("""
@@ -3687,7 +3922,7 @@ class DedupMainWindow(QMainWindow):
                 heat_canvas.set_pixmap(cv2_to_qpixmap(diff_bgr))
                 h_lay.addWidget(heat_canvas, stretch=1)
 
-                self.viewport_layout.addWidget(heat_frame, stretch=1)
+                self.viewport_layout.addWidget(heat_frame, 1, 0, 1, 2)
 
     def _on_canvas_view_changed(self, source_unit: ViewportUnit, zoom: float, h_ratio: float, v_ratio: float):
         if not self._sync_zoom_enabled:
@@ -3707,6 +3942,7 @@ class DedupMainWindow(QMainWindow):
         QShortcut(QKeySequence("1"), self).activated.connect(lambda: self._keep_by_index(0))
         QShortcut(QKeySequence("2"), self).activated.connect(lambda: self._keep_by_index(1))
         QShortcut(QKeySequence("3"), self).activated.connect(lambda: self._keep_by_index(2))
+        QShortcut(QKeySequence("4"), self).activated.connect(lambda: self._keep_by_index(3))
         QShortcut(QKeySequence(Qt.Key_Space), self).activated.connect(self._whitelist_current_group)
         QShortcut(QKeySequence(Qt.Key_Delete), self).activated.connect(self._discard_non_recommended)
         QShortcut(QKeySequence("Ctrl+Z"), self).activated.connect(self._undo_last_delete)
@@ -3714,13 +3950,27 @@ class DedupMainWindow(QMainWindow):
         QShortcut(QKeySequence(Qt.Key_Right), self).activated.connect(self._go_next_group)
         QShortcut(QKeySequence(Qt.Key_F1), self).activated.connect(self._show_about_dialog)
 
-    def _keep_by_index(self, idx: int):
+    def _keep_by_index(self, key_num: int):
         if self.phase_stack.currentIndex() != self.PHASE_REVIEW or not self.current_group:
             return
-        if 0 <= idx < len(self.current_group.items):
-            target = self.current_group.items[idx]
-            if not target.deleted:
-                self._on_keep_only_item(target)
+        grp = self.current_group
+        if not self.btn_cap_grid.isChecked() or len(grp.items) <= 2:
+            # 双视口聚焦模式：1 保留左图 (A/参考图)，2 保留当前右图 (选中的对比图)
+            if key_num == 0:
+                best_item = max(grp.active_items, key=lambda it: (it.pixel_count, it.filesize)) if grp.active_items else grp.items[0]
+                self._on_keep_only_item(best_item)
+            elif key_num == 1:
+                cand_idx = self.current_candidate_idx
+                if 0 <= cand_idx < len(grp.items):
+                    cand_item = grp.items[cand_idx]
+                    if not cand_item.deleted:
+                        self._on_keep_only_item(cand_item)
+        else:
+            # 网格平铺模式：数字键对应组内卡片序号
+            if 0 <= key_num < len(grp.items):
+                target = grp.items[key_num]
+                if not target.deleted:
+                    self._on_keep_only_item(target)
 
     def _discard_non_recommended(self):
         """按 Delete 键：自动保留智能推荐项并废弃其余重复项"""
@@ -3738,7 +3988,13 @@ class DedupMainWindow(QMainWindow):
         self.lbl_dock_progress.setText(msg)
         self.btn_cap_undo.setEnabled(len(self.engine.undo_stack) > 0)
         if ok:
-            self._after_decision_advance()
+            active_left = [it for it in self.current_group.active_items if not it.deleted]
+            if len(active_left) > 1:
+                self._refresh_group_list()
+                self._render_current_group()
+            else:
+                self.current_group.resolved = True
+                self._after_decision_advance()
 
     def _on_keep_only_item(self, keep_item: ImageItem):
         if not self.current_group:
