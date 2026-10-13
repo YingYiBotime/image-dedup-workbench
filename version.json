@@ -1,15 +1,15 @@
 {
-  "version": "4.0.8",
-  "published_at": "2026-10-13 18:41:35",
+  "version": "4.0.9",
+  "published_at": "2026-10-13 19:32:14",
   "hotpatch_files": {
-    "app.py": "c62dc40d6b271b59a64376fb1096406b4748f3c894cee5e069cf8785608e5240",
+    "app.py": "20b9b55ac7563f530e3b7e4240d414bf2352b4ce622870bdb90d66bd88d39997",
     "engine.py": "9d53f9681d146e2da83104497fbf8268738881d5861dbf992e12aac40f9dc77e",
-    "core_infra.py": "225ab1785a2e88bb095f1c95cdb6fbad034ae62f0d2820e5420d82df889eb5d0",
+    "core_infra.py": "1a8e4dc980f47bdb10c2a2fe26380f9b0e7f2fbf2858fca3061cbae5b1fe84df",
     "generate_icon.py": "78f74c68853a8f57856f45c1e4f759c33d60e060336a80655c09f105c104bb35",
     "github_ota_config.json": "1dd58c6aae5ebb6933471858809869312d77d4d064f7f428820f5ea1410b2dab"
   },
-  "hotpatch_size_kb": 307.5,
-  "hotpatch_sha256": "818a51deb95ff2161c9ce3255bb5b27ea609b8c684efbce4ee8935941d4e1ca7",
-  "hotpatch_rsa_sig": "OGreNdm3ZdbUSqeWzb03jaZsOUwu8x2aSov6rfcNr1JvIqyRXXlc-OJ0daxMinxZQCLiome4rAAeBnotUq26rZnZ6HECiYNk_D_hf2WnRf59MDowbW_B_9RpDFC1_3xWowPfknXIzh9CLBc8ZjZGD817LVoO0hVd2FQVBWrUv12NCdjFEk16v8DhsAwZdOkSEsRMouTbr9Wg6e2EEWpcmj8vWxbcfEiajNoFBmmr1TlpdaSk1SiHixokI-5dik4_flOQaXBYV8Ozq36JFg2M-sAeAyYnznisWXXgmAR-i8cwGlh3HvXCYavSJmDQe3XTBGnzJ2PsXASKLgwyE5Ofgg",
-  "notes": "多图组默认开启2列网格平铺杜绝漏查；优化滚轮翻页与缩放逻辑；升级全局滚动条"
+  "hotpatch_size_kb": 328.4,
+  "hotpatch_sha256": "dbb0c8e4dafce6fe71e9e83e7d3b42f2ed47494be802cd7743396e450fb18926",
+  "hotpatch_rsa_sig": "ax0SyNVV7b2WRPXCSocy8MPx4-YuP_3M4uSS8NrxXSSI3mW4mKH2kgQr8Hbh2w5s0_Ehwvg3as5FyV5Cg-sKxzcOOe2WJ6md_9sG9HzeVCu-U4CUoIpAOYLe9ER92tPGXPC8Kb6k53_fHtFNinDb9KJLy0cMuw4k1bwX_W_ACGxga5WEeECJaXM0YX1USSsLHTth9niPj59WApaBz_8MAO4ZJ4HIw85mqdA9HHB8xZ5Prd6DGaFMzeMZSYX8goWEWx8X_hFJr4d0Jgqbi1gv-SDds0aeJNt9C9wy9TQFq85LKV-ttMXgeM9VTeKozTenyZsWKKwkA13T-qfG6ZZuxw",
+  "notes": "重构缩略图采样解码与视口内存代理彻底根治卡顿崩溃；新增单列大图瀑布流与双击全屏巨幅灯箱检视"
 }

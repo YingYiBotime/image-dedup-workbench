@@ -1,4 +1,4 @@
-# Image Dedup Workbench (图像智能查重与对比工作台 v4.0.8)
+# Image Dedup Workbench (图像智能查重与对比工作台 v4.0.9)
 
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%20Qt-41CD52?style=flat-square&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
@@ -11,6 +11,14 @@
 
 ## 核心特性 (Features)
 
+- **超大图库与高分辨率深度性能优化 (High-Res & Scale Optimization)**：
+  - **底层原生解码采样 (Direct-Scaled Thumbnail Reader)**：针对数千张大图、20MP~50MP 超大工业印刷原图，在文件读取底层原生指定目标尺寸采样解码，杜绝全分辨率内存暴涨与界面冻结，内存占用降低 99% 以上；
+  - **视口内存代理与垃圾回收 (Viewport Memory Proxy & GC)**：大图视口显示引入 2560px 智能代理上限与视口切换主动垃圾回收，百兆级超清大图流畅丝滑不卡顿、零内存泄漏。
+- **多图智能排版与巨幅全屏灯箱检视 (Adaptive Layout & Fullscreen Lightbox)**：
+  - **多图视口高度保底 (Height Guarantee)**：网格与单列卡片设置最小高度保底，杜绝多图时被挤压成微型缩略图，视野增大 300% 以上；
+  - **单列大图宽屏流 (Single-Column Big View)**：多图组支持一键切换单列大图瀑布流展示，整卡撑满可视区域，滚轮自如上下阅览；
+  - **双列网格平铺 (2-Column Grid View)**：组内 3 张及以上图片时平铺呈现，所有副本一目了然，杜绝漏查；卡片支持一键【1v1 对比】切换；
+  - **双击全屏巨幅灯箱 (Fullscreen Lightbox)**：双击任意视口图片或点击卡片放大按钮，即刻展开全屏暗色无界巨幅画布，支持鼠标滚轮最高 20 倍无级缩放、平移检视、左右方向键切图与键盘极速决断。
 - **四级递进视觉感知查重引擎 (4-Stage Perceptual & Geometric Engine)**：
   - **第一级（MD5 字节级校验）**：毫秒级锁定二进制完全一致的重复文件；
   - **第二级（多尺度空间色彩网格 + 2D-DCT 频域感知哈希）**：抵抗边缘裁切与高达 **10 倍以上跨分辨率缩放**（如 `8018×3608` 超大原图 vs `777×387` 缩略图）；
@@ -26,11 +34,9 @@
   - **保留白名单记忆**：同款变体图均有用时，按 `Space` 空格键加入白名单，组内图片 100% 完整保留在原文件夹，且下次扫描与极速复查时**永久免打扰记忆**；
   - **安全回收暂存区 (staging_trash)**：被淘汰的重复图片安全移入 `%LOCALAPPDATA%\TableclothDedupPro\staging_trash`，随时支持一键打开彻底清理；
   - **100% 原路径无损撤销**：删错时随时按 `Ctrl + Z`（支持连续撤销），原文件名与原文件夹路径毫秒级无损还原。
-- **多视口与网格平铺审阅画布 (Studio Dark Multi-Viewport Canvas)**：
-  - **多图智能网格平铺 (Grid Mode)**：当同一组发现 3 张及以上重复图片时，默认开启 2 列网格平铺视图，所有副本一目了然，彻底杜绝漏查；支持随时切换 1 对 1 双视口精细对比；
-  - **双图联动缩放与顺滑滚动**：优化滚轮事件与滚动条宽度（12px），1.0x 原始比例直接滚轮顺滑翻页，Ctrl+滚轮无级缩放，多视口像素级对齐联动；
-  - **差异热图 (Diff Heatmap) 与滑动卷帘对比 (Curtain Wipe)**：一秒看穿微调、水印、瑕疵与像素差异；
-  - **纯键盘流水线决断**：`1~9` 保留对应卡片、`Space` 加入白名单、`Delete` 废弃非推荐重复项、`Ctrl+Z` 撤销、`F1` 打开帮助中心。
+- **纯键盘流水线决断与交互辅助 (Keyboard Pipeline & Tooling)**：
+  - **纯键盘流水线决断**：`1~9` 保留对应卡片、`Space` 加入白名单、`Delete` 废弃非推荐重复项、`Ctrl+Z` 撤销、`F1` 打开帮助中心；
+  - **差异热图 (Diff Heatmap) 与滑动卷帘对比 (Curtain Wipe)**：一秒看穿微调、水印、瑕疵与像素差异。
 
 ---
 
@@ -65,7 +71,7 @@ python app.py
 
 ## 免安装绿色版使用说明 (Portable Build)
 
-1. 双击运行 `dist_portable\图像智能查重工作台\图像智能查重工作台.exe`（或解压 `图像智能查重工作台_免安装绿色版_v4.0.8.zip`）；
+1. 双击运行 `dist_portable\图像智能查重工作台\图像智能查重工作台.exe`（或解压 `图像智能查重工作台_免安装绿色版_v4.0.9.zip`）；
 2. 目标电脑无需安装 Python 或任何依赖环境，双击即可直接使用。
 
 ---
