@@ -110,7 +110,7 @@ def sync_source_version(new_version: str):
 
 
 def build_signed_hotpatch(new_version: str, notes: str, repo: str, branch: str = DEFAULT_GITHUB_BRANCH) -> dict:
-    """生成纯文本源码增量更新清单 version.json（零 .zip / .exe 二进制文件，杜绝触发平台风控）"""
+    """生成纯文本源码增量更新清单 version.json（统一 LF 换行符，确保本地与 GitHub Raw 字节 100% 一致）"""
     sync_source_version(new_version)
     hotpatch_files = {}
     total_bytes = 0
@@ -119,8 +119,12 @@ def build_signed_hotpatch(new_version: str, notes: str, repo: str, branch: str =
         if os.path.isfile(fp):
             with open(fp, "rb") as f:
                 raw = f.read()
-            total_bytes += len(raw)
-            hotpatch_files[fn] = hashlib.sha256(raw).hexdigest().lower()
+            norm_raw = raw.replace(b"\r\n", b"\n")
+            if norm_raw != raw:
+                with open(fp, "wb") as f:
+                    f.write(norm_raw)
+            total_bytes += len(norm_raw)
+            hotpatch_files[fn] = hashlib.sha256(norm_raw).hexdigest().lower()
 
     items = sorted(hotpatch_files.items())
     combined_payload = "\n".join(f"{fn}:{h}" for fn, h in items)

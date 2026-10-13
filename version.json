@@ -1,15 +1,15 @@
 {
   "version": "4.0.5",
-  "published_at": "2026-10-13 15:03:16",
+  "published_at": "2026-10-13 15:09:29",
   "hotpatch_files": {
-    "app.py": "1f9922b6a622d632654357f9d15194e8119c37e032bb4f204b3bba875e5fec35",
+    "app.py": "37b72977dc2795be5fc735add544c05742c55a4c7b22f8fe441c5c1f180cc7bf",
     "engine.py": "9d53f9681d146e2da83104497fbf8268738881d5861dbf992e12aac40f9dc77e",
-    "core_infra.py": "2cafa05543bed1350f589553b999879f243bc1fb6d865ce9fba3f96871d8772b",
+    "core_infra.py": "c88b107e31ffba0da8ce55f6bcd4831be74bcafd25a99978e53528ee4da81067",
     "generate_icon.py": "78f74c68853a8f57856f45c1e4f759c33d60e060336a80655c09f105c104bb35",
-    "github_ota_config.json": "9e5d4ebcd6ae2c2e44977a772af9db277d9f654d4d4ceaa70e4ce3b9fec5c525"
+    "github_ota_config.json": "1dd58c6aae5ebb6933471858809869312d77d4d064f7f428820f5ea1410b2dab"
   },
-  "hotpatch_size_kb": 300.2,
-  "hotpatch_sha256": "5110f0c7638be134312e311fc5cd6ded317019de9caa558dfa8547e354b9699a",
-  "hotpatch_rsa_sig": "ENWSf5Q6Q475XzPTuv762l-mkSMPkyOWGng6T5CwvhVvfOIxrbDsSAwpCQ6j7h7VSSpEkT8l9SygZxnwemuqYLdwFDTjZtmcOK4Zcfu7sLSr-pZT2jyZzzvdKOVIcUTYJpwRULToJsKkhSpZoY-Mgc_KPKs_N5Q5W6IJL4aYibCQG2fU7SoEUvHbjY_L8LD7l03-VXMenxWyfpK3ZNyLa2mOHQUQPAwIHOodlMUFGsIMT6zlzMdKjSClVMOSRUEGErj-TFRJAWjhSGLd5VVrzQODt5oE266bkpqb7DN1XEXIqCQUVlshN_Sfq6v4gPkJM8ueA5xBD4i-cZBOhrCCVA",
+  "hotpatch_size_kb": 294.7,
+  "hotpatch_sha256": "2f2bee968286f27c8c9567b22a52f1b15ec6656732d493c8afa1aaa385a1c80c",
+  "hotpatch_rsa_sig": "O3jF73OW0qaa5qsv3BGpazmUGucMNQf_8eJDI4hNRg5lHZavMjgMA9lLWT7WXj-7KtV7ETJx1xNsCzTRZNw3nWlrXu4mtQwnBiHMC7-fkhyqFGe589tVLGCzuD9bbPq6Qe3fZlY_e_P_3qHsQvWBonLhNsbS9F_RehKUlE0NiLjfS7htMo5XcSjNs55KamBbacwMP77AnpIvkTDqzEIo921gBa4cbFg26v2xv8LcDnyQMIqveTMTm-8yiIGnAP8IEWlwj4JR78h5exj6UzDCOFhjNAnwhymLf4LEHD25enIWb95olfOz0ML0UMq234pLGyyMSg6goGx89Y73IPFUYg",
   "notes": "1. 升级为标准商业软件更新体验：检测到新版本时弹窗询问是否更新，点击【立即更新】后在电脑上全自动完成升级并重启；\n2. 内置【使用指南与常见问题帮助中心 (F1)】，详解白名单功能与已删图片暂存区找回方法；\n3. 默认仅扫描当前顶层文件夹，支持可选【包含子文件夹】开关。"
 }

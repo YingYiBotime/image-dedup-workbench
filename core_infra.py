@@ -1261,6 +1261,8 @@ class UpdateDownloadWorker(QThread):
                     )
                     with urllib.request.urlopen(req, timeout=10.0) as resp:
                         raw_bytes = resp.read()
+                    if base_fn.endswith((".py", ".json")):
+                        raw_bytes = raw_bytes.replace(b"\r\n", b"\n")
                     actual_hash = hashlib.sha256(raw_bytes).hexdigest().lower()
                     if exp_hash and actual_hash != exp_hash:
                         last_err = f"{base_fn} SHA-256 不匹配"
