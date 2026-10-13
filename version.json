@@ -1,0 +1,15 @@
+{
+  "version": "4.0.4",
+  "published_at": "2026-10-13 14:46:56",
+  "hotpatch_files": {
+    "app.py": "01e3c1bb64e8c16cc2f0775f7a3787d6ca8c6d41102918e8c40b83dc5c8b2ec1",
+    "engine.py": "9d53f9681d146e2da83104497fbf8268738881d5861dbf992e12aac40f9dc77e",
+    "core_infra.py": "d6dd7e07da4e06dc0f1df6e12b5bbed5fe019433823d96db9454c9af71f814af",
+    "generate_icon.py": "78f74c68853a8f57856f45c1e4f759c33d60e060336a80655c09f105c104bb35",
+    "github_ota_config.json": "9e5d4ebcd6ae2c2e44977a772af9db277d9f654d4d4ceaa70e4ce3b9fec5c525"
+  },
+  "hotpatch_size_kb": 294.5,
+  "hotpatch_sha256": "13e300115ddbcacf205e82dc9b0460cf0df0ca0f2e89a4d687c90d73121ceb04",
+  "hotpatch_rsa_sig": "fP4DCc3duJqJ3UbZmKP9w52G64QE27SZHH_z_c6AIIqrBibjn-g4xs80U0Dwu_AYTCQsIbEBtsztE4sGGSevJIJEHgyaa8VRHKuS-L3Kvo4zG6VxhNRcNrJkgR3eBHUjQEdUwHWnVx5OHw6owe85IrBV7oc8sEUHxk6syRFy3OwPUVuyLgmRPCfatOwQjpB04LdQoXQqXAI7VVAiY_9P3DbZpqZB3loRRxY5KSmERS9dsZzcAUpGTy4lxi5uCCqarxol0xtWyx93gavONCeTiX6XAIrars7oA1MymroK_YK_C9oFhcvvF1ch0A4v4DZ4ckKThTU8KWLlPxmkOVP6ew",
+  "notes": "1. 升级为标准商业软件更新体验：检测到新版本时弹窗询问是否更新，点击【立即更新】后在电脑上全自动完成升级并重启；\n2. 内置【使用指南与常见问题帮助中心 (F1)】，详解白名单功能与已删图片暂存区找回方法；\n3. 默认仅扫描当前顶层文件夹，支持可选【包含子文件夹】开关。"
+}

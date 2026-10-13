@@ -1,0 +1,47 @@
+# Byte-compiled / optimized / DLL / binary archive files
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec
+*.zip
+*.exe
+build/
+dist/
+build_portable/
+dist_portable/
+
+# Keep private signing and local build scripts local only
+license_issuer.py
+upload_release_to_github.py
+build_commercial.ps1
+installer.iss
+一键发布热更新到GitHub.bat
+一键生成免安装绿色版.bat
+启动图像查重工具.bat
+
+# Operating System files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# IDE files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Runtime generated files
+*.log
+*.tmp
+temp/
+
+# Keep app icon assets
+!app_icon.png
+!app_icon.ico
