@@ -1,15 +1,15 @@
 {
-  "version": "4.0.9",
-  "published_at": "2026-10-13 19:32:14",
+  "version": "4.1.0",
+  "published_at": "2026-10-13 20:10:40",
   "hotpatch_files": {
-    "app.py": "20b9b55ac7563f530e3b7e4240d414bf2352b4ce622870bdb90d66bd88d39997",
+    "app.py": "73aaafd2affcc76518fb00408d75415888614c64e1be5c67c730719031764d01",
     "engine.py": "9d53f9681d146e2da83104497fbf8268738881d5861dbf992e12aac40f9dc77e",
-    "core_infra.py": "1a8e4dc980f47bdb10c2a2fe26380f9b0e7f2fbf2858fca3061cbae5b1fe84df",
+    "core_infra.py": "198331a35fd8c78c2ae7458a233ede29d56e2eafae3eb42a1d80304339098249",
     "generate_icon.py": "78f74c68853a8f57856f45c1e4f759c33d60e060336a80655c09f105c104bb35",
     "github_ota_config.json": "1dd58c6aae5ebb6933471858809869312d77d4d064f7f428820f5ea1410b2dab"
   },
-  "hotpatch_size_kb": 328.4,
-  "hotpatch_sha256": "dbb0c8e4dafce6fe71e9e83e7d3b42f2ed47494be802cd7743396e450fb18926",
-  "hotpatch_rsa_sig": "ax0SyNVV7b2WRPXCSocy8MPx4-YuP_3M4uSS8NrxXSSI3mW4mKH2kgQr8Hbh2w5s0_Ehwvg3as5FyV5Cg-sKxzcOOe2WJ6md_9sG9HzeVCu-U4CUoIpAOYLe9ER92tPGXPC8Kb6k53_fHtFNinDb9KJLy0cMuw4k1bwX_W_ACGxga5WEeECJaXM0YX1USSsLHTth9niPj59WApaBz_8MAO4ZJ4HIw85mqdA9HHB8xZ5Prd6DGaFMzeMZSYX8goWEWx8X_hFJr4d0Jgqbi1gv-SDds0aeJNt9C9wy9TQFq85LKV-ttMXgeM9VTeKozTenyZsWKKwkA13T-qfG6ZZuxw",
-  "notes": "重构缩略图采样解码与视口内存代理彻底根治卡顿崩溃；新增单列大图瀑布流与双击全屏巨幅灯箱检视"
+  "hotpatch_size_kb": 338.4,
+  "hotpatch_sha256": "7db226b0d6e267c220024ac7cbd9db97de5a446ef38983dea474c79213daf9cd",
+  "hotpatch_rsa_sig": "PWbxmqX8g_Gaao-o0B-4OCVCp-JrIYih37fYJo6j5qTAqOvdIhe2--FRqq8epAL0bPtbI3hVB4ljzU7Fe6T9-C7eejFpy8RY-x_H99DZa7FdfDAVT4nha40hYoyROZwxOaX2_R_Pd8MIg-neePxpKQloy07hdezvhgXd-4opHiU7mRClEFsc7VycU8EiM60g6nbCL2WsJFG3gweS2eFiHBwVdxPQ9txI6qSK31GudbXRHkVR_ybfErfWF0NsmPdKbC0at6MAeI-_jcJNk3cyRy1hdFZucLisTQZwTdZosJ5BNoEEGPEO3c7IuP-Cacn_uvLLHS1X7hibl_4dcAitGw",
+  "notes": "重构双级视口高分位图缓存池与后台相邻组异步预加载，实现模式切换与翻组零延迟瞬切；重构左侧导航列表局部增量刷新与空闲防抖GC，彻底消灭删除保留卡顿"
 }

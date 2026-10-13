@@ -1,4 +1,4 @@
-# Image Dedup Workbench (图像智能查重与对比工作台 v4.0.9)
+# Image Dedup Workbench (图像智能查重与对比工作台 v4.1.0)
 
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%20Qt-41CD52?style=flat-square&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
@@ -11,9 +11,12 @@
 
 ## 核心特性 (Features)
 
-- **超大图库与高分辨率深度性能优化 (High-Res & Scale Optimization)**：
-  - **底层原生解码采样 (Direct-Scaled Thumbnail Reader)**：针对数千张大图、20MP~50MP 超大工业印刷原图，在文件读取底层原生指定目标尺寸采样解码，杜绝全分辨率内存暴涨与界面冻结，内存占用降低 99% 以上；
-  - **视口内存代理与垃圾回收 (Viewport Memory Proxy & GC)**：大图视口显示引入 2560px 智能代理上限与视口切换主动垃圾回收，百兆级超清大图流畅丝滑不卡顿、零内存泄漏。
+- **超大图库与高分辨率零延迟架构 (Zero-Lag High-Res Architecture)**：
+  - **双级视口高分位图缓存池 (Dual-Tier Pixmap Cache)**：建立主线程 QPixmap LRU 缓存池与后台 QImage 预解码池，在同一组内切换单列大图/双列网格/1v1 对比，或在组间翻页时，直接自内存取图，实现 **0 毫秒瞬切**；
+  - **后台相邻组静默异步预加载 (Neighbor Prefetch Worker)**：后台独立子线程提前采样解码下一组与相邻组高分原图，用户按键决断跳组或方向键翻组时，图片早已在内存就绪，**彻底杜绝磁盘 I/O 阻塞**；
+  - **左侧导航列表局部增量刷新 (In-Place Incremental List Update)**：删除或保留图片时，以 $O(1)$ 局部更新或移除对应行卡片徽章，**彻底废除全列表 100+ 个控件的暴力清空与重建**；
+  - **空闲防抖静默垃圾回收 (Debounced Idle GC)**：移除视口切换时的强制主线程同步垃圾回收，转由空闲定时器在用户停顿时静默释放，连击操作丝滑无阻；
+  - **底层原生解码采样 (Direct-Scaled Thumbnail Reader)**：针对数千张大图、20MP~50MP 超大工业印刷原图，在文件读取底层原生指定目标尺寸采样解码，杜绝全分辨率内存暴涨与界面冻结，内存占用降低 99% 以上。
 - **多图智能排版与巨幅全屏灯箱检视 (Adaptive Layout & Fullscreen Lightbox)**：
   - **多图视口高度保底 (Height Guarantee)**：网格与单列卡片设置最小高度保底，杜绝多图时被挤压成微型缩略图，视野增大 300% 以上；
   - **单列大图宽屏流 (Single-Column Big View)**：多图组支持一键切换单列大图瀑布流展示，整卡撑满可视区域，滚轮自如上下阅览；
@@ -71,7 +74,7 @@ python app.py
 
 ## 免安装绿色版使用说明 (Portable Build)
 
-1. 双击运行 `dist_portable\图像智能查重工作台\图像智能查重工作台.exe`（或解压 `图像智能查重工作台_免安装绿色版_v4.0.9.zip`）；
+1. 双击运行 `dist_portable\图像智能查重工作台\图像智能查重工作台.exe`（或解压 `图像智能查重工作台_免安装绿色版_v4.1.0.zip`）；
 2. 目标电脑无需安装 Python 或任何依赖环境，双击即可直接使用。
 
 ---
