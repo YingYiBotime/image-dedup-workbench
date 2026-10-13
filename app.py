@@ -54,7 +54,7 @@ def _bootstrap_hotpatch():
     """启动时检查 %LOCALAPPDATA%\\TableclothDedupPro\\hotpatch 下是否有更新的云端热补丁并无缝接管"""
     if getattr(sys, "_tdpro_hotpatch_bootstrapped", False):
         return
-    builtin_version = "4.0.7"
+    builtin_version = "4.0.8"
     local_base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~\\AppData\\Local")
     hp_dir = os.path.join(local_base, "TableclothDedupPro", "hotpatch")
     hp_manifest = os.path.join(hp_dir, "hotpatch_manifest.json")
@@ -1898,23 +1898,44 @@ class SyncZoomImageView(QGraphicsView):
         if self._zoom_level == 1.0 and self._has_image:
             self.fitInView(self._scene.sceneRect(), Qt.KeepAspectRatio)
 
+    def _find_parent_scroll_area(self) -> Optional[QScrollArea]:
+        w = self.parentWidget()
+        while w:
+            if isinstance(w, QScrollArea):
+                return w
+            w = w.parentWidget()
+        return None
+
     def wheelEvent(self, event: QWheelEvent):
         if not self._has_image:
+            event.ignore()
             return
+
+        is_ctrl = bool(event.modifiers() & Qt.ControlModifier)
+        if not is_ctrl and self._zoom_level <= 1.001:
+            parent_scroll = self._find_parent_scroll_area()
+            if parent_scroll and parent_scroll.verticalScrollBar().maximum() > 0:
+                event.ignore()
+                return
+
         angle = event.angleDelta().y()
         if angle == 0:
+            event.ignore()
             return
         factor = 1.22 if angle > 0 else 1 / 1.22
         new_zoom = self._zoom_level * factor
-        if new_zoom < 0.8:
+        if new_zoom < 0.95:
             self.reset_view()
             self._emit_sync()
+            event.accept()
             return
         if new_zoom > 20.0:
+            event.accept()
             return
         self._zoom_level = new_zoom
         self.scale(factor, factor)
         self._emit_sync()
+        event.accept()
 
     def _on_scroll_changed(self):
         if not self._is_syncing and self._has_image:
@@ -3344,14 +3365,14 @@ class DedupMainWindow(QMainWindow):
         self.btn_cap_curtain.toggled.connect(self._on_curtain_toggled)
         cap_layout.addWidget(self.btn_cap_curtain)
 
-        # [网格平铺 (多图时显示)]
+        # [网格平铺 (多图时显示，默认保持勾选平铺)]
         self.btn_cap_grid = QPushButton(" 网格平铺")
-        self.btn_cap_grid.setIcon(LucideIcon.icon("grid", 14, "#d4d4d8"))
+        self.btn_cap_grid.setIcon(LucideIcon.icon("grid", 14, "#ffffff"))
         self.btn_cap_grid.setFixedHeight(28)
         self.btn_cap_grid.setCheckable(True)
-        self.btn_cap_grid.setChecked(False)
+        self.btn_cap_grid.setChecked(True)
         self.btn_cap_grid.setCursor(Qt.PointingHandCursor)
-        self.btn_cap_grid.setToolTip("组内有 3 张以上图片时，切换为 2 列网格平铺浏览")
+        self.btn_cap_grid.setToolTip("组内有 3 张以上图片时默认开启 2 列网格平铺，全部副本一览无余；取消勾选可切换为 1 对 1 聚焦双视口")
         self.btn_cap_grid.toggled.connect(self._on_grid_toggled)
         self.btn_cap_grid.setVisible(False)
         cap_layout.addWidget(self.btn_cap_grid)
@@ -3824,6 +3845,7 @@ class DedupMainWindow(QMainWindow):
             pix_b = load_qpixmap_safe(cand_item.filepath)
             curtain = CurtainCompareWidget(pix_a, pix_b, ref_item.filename, cand_item.filename)
             self.viewport_layout.addWidget(curtain, 0, 0, 1, 2)
+            self.lbl_dock_shortcuts.setText("左右拖拽滑块对比  |  Delete 废弃非推荐  |  Space 白名单  |  Ctrl+Z 撤销")
             self.right_inspector.update_group(grp, item_a=ref_item, item_b=cand_item)
             return
 
@@ -3851,10 +3873,12 @@ class DedupMainWindow(QMainWindow):
 
             self.viewport_layout.setColumnStretch(0, 1)
             self.viewport_layout.setColumnStretch(1, 1)
+            self.lbl_dock_shortcuts.setText(f"1~{len(grp.items)} 保留单图  |  Delete 废弃其余副本  |  Space 白名单  |  Ctrl+Z 撤销")
             self.right_inspector.update_group(grp, item_a=ref_item, item_b=cand_item)
             return
 
         # 3. 标准双视口聚焦对比模式 (默认：左侧原始推荐原图 vs 右侧当前选中的对比图)
+        self.lbl_dock_shortcuts.setText("1 保留A  |  2 保留B  |  Space 白名单  |  Delete 废弃其余副本  |  Ctrl+Z 撤销")
         ref_idx = grp.items.index(ref_item) if ref_item in grp.items else 0
         unit_a = ViewportUnit(
             index_in_group=ref_idx,
@@ -3938,11 +3962,9 @@ class DedupMainWindow(QMainWindow):
     # ==================== 纯键盘流水线作业与安全可逆操作 ====================
 
     def _bind_shortcuts(self):
-        # 1 保留A | 2 保留B | Space 白名单 | Delete 废弃非推荐项 | Ctrl+Z 撤销 | 左右方向键翻组 | F1 帮助指南
-        QShortcut(QKeySequence("1"), self).activated.connect(lambda: self._keep_by_index(0))
-        QShortcut(QKeySequence("2"), self).activated.connect(lambda: self._keep_by_index(1))
-        QShortcut(QKeySequence("3"), self).activated.connect(lambda: self._keep_by_index(2))
-        QShortcut(QKeySequence("4"), self).activated.connect(lambda: self._keep_by_index(3))
+        # 1~9 保留对应单图 | Space 白名单 | Delete 废弃非推荐项 | Ctrl+Z 撤销 | 左右方向键翻组 | F1 帮助指南
+        for digit in range(1, 10):
+            QShortcut(QKeySequence(str(digit)), self).activated.connect(lambda d=digit - 1: self._keep_by_index(d))
         QShortcut(QKeySequence(Qt.Key_Space), self).activated.connect(self._whitelist_current_group)
         QShortcut(QKeySequence(Qt.Key_Delete), self).activated.connect(self._discard_non_recommended)
         QShortcut(QKeySequence("Ctrl+Z"), self).activated.connect(self._undo_last_delete)

@@ -1,15 +1,15 @@
 {
-  "version": "4.0.7",
-  "published_at": "2026-10-13 16:57:24",
+  "version": "4.0.8",
+  "published_at": "2026-10-13 18:41:35",
   "hotpatch_files": {
-    "app.py": "59a94b9e55c52315d4a1b5523c52a321d069fda0f2a867b458c43f8581be569a",
+    "app.py": "c62dc40d6b271b59a64376fb1096406b4748f3c894cee5e069cf8785608e5240",
     "engine.py": "9d53f9681d146e2da83104497fbf8268738881d5861dbf992e12aac40f9dc77e",
-    "core_infra.py": "90921be38d9c3e26294d30425f35f79ed46db851e344bff591fb44dc98dfa1e7",
+    "core_infra.py": "225ab1785a2e88bb095f1c95cdb6fbad034ae62f0d2820e5420d82df889eb5d0",
     "generate_icon.py": "78f74c68853a8f57856f45c1e4f759c33d60e060336a80655c09f105c104bb35",
     "github_ota_config.json": "1dd58c6aae5ebb6933471858809869312d77d4d064f7f428820f5ea1410b2dab"
   },
-  "hotpatch_size_kb": 306.5,
-  "hotpatch_sha256": "620de0acaf7f7e9073371f70174a5f0c22b6fd7d60d54154931dcc34d6545284",
-  "hotpatch_rsa_sig": "c95JdJISk5u9uYiRsojRLmB7KKsSGSdbKNWouSaD4-4bWtOlzaX1xkazwMukh5MD2vXYuni0QBq71crEUdaiPeNHgWOPHAWdApryxXl_ZRoPPRfYWSIEtQIXsuhWTeahgX6xqF_cjaaLA1U5cnzm8L-qVokwkWW9S3U_9py--ffSw_Q-pv0vKAXSAeh8mBDuzHJtY0TgJLYEfjSSOJuGo-LGtaZP54AXOL5VROy7-mJc6H3FtYl54bm2O3PvlkkVHhZCnnrMUwi9D3Xzu0oVf0BTq-SDPkBR3UawKF_aOu6KhY8eLZ8FKo6dZ8MggEGKLhAmYrOUpp9rWrZ43KyQkQ",
-  "notes": "优化滚动条拉杆手感；多图同款支持双视口候选切换与2列网格平铺，消除横向拉杆"
+  "hotpatch_size_kb": 307.5,
+  "hotpatch_sha256": "818a51deb95ff2161c9ce3255bb5b27ea609b8c684efbce4ee8935941d4e1ca7",
+  "hotpatch_rsa_sig": "OGreNdm3ZdbUSqeWzb03jaZsOUwu8x2aSov6rfcNr1JvIqyRXXlc-OJ0daxMinxZQCLiome4rAAeBnotUq26rZnZ6HECiYNk_D_hf2WnRf59MDowbW_B_9RpDFC1_3xWowPfknXIzh9CLBc8ZjZGD817LVoO0hVd2FQVBWrUv12NCdjFEk16v8DhsAwZdOkSEsRMouTbr9Wg6e2EEWpcmj8vWxbcfEiajNoFBmmr1TlpdaSk1SiHixokI-5dik4_flOQaXBYV8Ozq36JFg2M-sAeAyYnznisWXXgmAR-i8cwGlh3HvXCYavSJmDQe3XTBGnzJ2PsXASKLgwyE5Ofgg",
+  "notes": "多图组默认开启2列网格平铺杜绝漏查；优化滚轮翻页与缩放逻辑；升级全局滚动条"
 }

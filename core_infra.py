@@ -41,7 +41,7 @@ from PySide6.QtWidgets import (
 APP_VENDOR = "TableclothStudio"
 APP_INTERNAL_NAME = "TableclothDedupPro"
 APP_DISPLAY_NAME = "图像智能查重工作台"
-APP_VERSION = os.environ.get("TDPRO_ACTIVE_VERSION", "4.0.7")
+APP_VERSION = os.environ.get("TDPRO_ACTIVE_VERSION", "4.0.8")
 
 # 默认内置的专属 GitHub 仓库地址与分支
 DEFAULT_GITHUB_REPO = "YingYiBotime/image-dedup-workbench"

@@ -1,4 +1,4 @@
-# Image Dedup Workbench (图像智能查重与对比工作台 v4.0.7)
+# Image Dedup Workbench (图像智能查重与对比工作台 v4.0.8)
 
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%20Qt-41CD52?style=flat-square&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
@@ -26,10 +26,11 @@
   - **保留白名单记忆**：同款变体图均有用时，按 `Space` 空格键加入白名单，组内图片 100% 完整保留在原文件夹，且下次扫描与极速复查时**永久免打扰记忆**；
   - **安全回收暂存区 (staging_trash)**：被淘汰的重复图片安全移入 `%LOCALAPPDATA%\TableclothDedupPro\staging_trash`，随时支持一键打开彻底清理；
   - **100% 原路径无损撤销**：删错时随时按 `Ctrl + Z`（支持连续撤销），原文件名与原文件夹路径毫秒级无损还原。
-- **专业双视口审阅画布 (Studio Dark Dual-Viewport Canvas)**：
-  - **双图联动缩放与平移**：滚轮平滑缩放，左右双视口毫秒级像素级对齐联动；
+- **多视口与网格平铺审阅画布 (Studio Dark Multi-Viewport Canvas)**：
+  - **多图智能网格平铺 (Grid Mode)**：当同一组发现 3 张及以上重复图片时，默认开启 2 列网格平铺视图，所有副本一目了然，彻底杜绝漏查；支持随时切换 1 对 1 双视口精细对比；
+  - **双图联动缩放与顺滑滚动**：优化滚轮事件与滚动条宽度（12px），1.0x 原始比例直接滚轮顺滑翻页，Ctrl+滚轮无级缩放，多视口像素级对齐联动；
   - **差异热图 (Diff Heatmap) 与滑动卷帘对比 (Curtain Wipe)**：一秒看穿微调、水印、瑕疵与像素差异；
-  - **纯键盘流水线决断**：`1` 仅留左图、`2` 仅留右图、`Space` 加入白名单、`Delete` 废弃重复项、`Ctrl+Z` 撤销、`F1` 打开使用指南与常见问题中心。
+  - **纯键盘流水线决断**：`1~9` 保留对应卡片、`Space` 加入白名单、`Delete` 废弃非推荐重复项、`Ctrl+Z` 撤销、`F1` 打开帮助中心。
 
 ---
 
@@ -64,7 +65,7 @@ python app.py
 
 ## 免安装绿色版使用说明 (Portable Build)
 
-1. 双击运行 `dist_portable\图像智能查重工作台\图像智能查重工作台.exe`（或解压 `图像智能查重工作台_免安装绿色版_v4.0.7.zip`）；
+1. 双击运行 `dist_portable\图像智能查重工作台\图像智能查重工作台.exe`（或解压 `图像智能查重工作台_免安装绿色版_v4.0.8.zip`）；
 2. 目标电脑无需安装 Python 或任何依赖环境，双击即可直接使用。
 
 ---
