@@ -1,4 +1,4 @@
-# Image Dedup Workbench (图像智能查重与对比工作台 v4.1.0)
+# Image Dedup Workbench (图像智能查重与对比工作台 v4.1.1)
 
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%20Qt-41CD52?style=flat-square&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
@@ -11,6 +11,10 @@
 
 ## 核心特性 (Features)
 
+- **严格绝对槽位与防误删架构 (Strict Fixed Slot Viewport)**：
+  - **彻底取消主观推荐偏见**：移除基于像素与体积的自动推荐算法与诱导性绿色标识，左右卡片统一采用中性暗色风格；
+  - **绝对锁定左图原始图与右图对比图**：跨文件夹或单文件夹查重对比时，左视口永远锁定为基准原始图 A（文件夹 1），右视口永远锁定为对比图 B/C...（文件夹 2），绝不发生位置对调；
+  - **键位与槽位绝对对应**：快捷键 `1` / [保留 (1)] 严格保留左侧原始图 A，快捷键 `2` / [保留 (2)] 严格保留右侧对比图 B，快捷键 `Delete` 快速保留左图原始图并废弃右侧对比副本，彻底杜绝误删。
 - **超大图库与高分辨率零延迟架构 (Zero-Lag High-Res Architecture)**：
   - **双级视口高分位图缓存池 (Dual-Tier Pixmap Cache)**：建立主线程 QPixmap LRU 缓存池与后台 QImage 预解码池，在同一组内切换单列大图/双列网格/1v1 对比，或在组间翻页时，直接自内存取图，实现 **0 毫秒瞬切**；
   - **后台相邻组静默异步预加载 (Neighbor Prefetch Worker)**：后台独立子线程提前采样解码下一组与相邻组高分原图，用户按键决断跳组或方向键翻组时，图片早已在内存就绪，**彻底杜绝磁盘 I/O 阻塞**；
@@ -38,7 +42,7 @@
   - **安全回收暂存区 (staging_trash)**：被淘汰的重复图片安全移入 `%LOCALAPPDATA%\TableclothDedupPro\staging_trash`，随时支持一键打开彻底清理；
   - **100% 原路径无损撤销**：删错时随时按 `Ctrl + Z`（支持连续撤销），原文件名与原文件夹路径毫秒级无损还原。
 - **纯键盘流水线决断与交互辅助 (Keyboard Pipeline & Tooling)**：
-  - **纯键盘流水线决断**：`1~9` 保留对应卡片、`Space` 加入白名单、`Delete` 废弃非推荐重复项、`Ctrl+Z` 撤销、`F1` 打开帮助中心；
+  - **纯键盘流水线决断**：`1` 保留左侧原始图 A、`2` 保留右侧对比图 B、`Delete` 快速保留左图废弃右图副本、`Space` 加入白名单、`Ctrl+Z` 撤销、`F1` 打开帮助中心；
   - **差异热图 (Diff Heatmap) 与滑动卷帘对比 (Curtain Wipe)**：一秒看穿微调、水印、瑕疵与像素差异。
 
 ---
@@ -74,7 +78,7 @@ python app.py
 
 ## 免安装绿色版使用说明 (Portable Build)
 
-1. 双击运行 `dist_portable\图像智能查重工作台\图像智能查重工作台.exe`（或解压 `图像智能查重工作台_免安装绿色版_v4.1.0.zip`）；
+1. 双击运行 `dist_portable\图像智能查重工作台\图像智能查重工作台.exe`（或解压 `图像智能查重工作台_免安装绿色版_v4.1.1.zip`）；
 2. 目标电脑无需安装 Python 或任何依赖环境，双击即可直接使用。
 
 ---

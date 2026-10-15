@@ -56,7 +56,7 @@ def _bootstrap_hotpatch():
     """启动时检查 %LOCALAPPDATA%\\TableclothDedupPro\\hotpatch 下是否有更新的云端热补丁并无缝接管"""
     if getattr(sys, "_tdpro_hotpatch_bootstrapped", False):
         return
-    builtin_version = "4.1.0"
+    builtin_version = "4.1.1"
     local_base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~\\AppData\\Local")
     hp_dir = os.path.join(local_base, "TableclothDedupPro", "hotpatch")
     hp_manifest = os.path.join(hp_dir, "hotpatch_manifest.json")
@@ -2416,15 +2416,6 @@ class ViewportUnit(QFrame):
         )
         hdr.addWidget(lbl_folder)
 
-        if self.is_recommended and not self.item.deleted:
-            lbl_rec = QLabel("智能推荐保留")
-            lbl_rec.setStyleSheet(
-                "background-color: rgba(16, 185, 129, 0.12); color: #10b981; "
-                "border: 1px solid rgba(16, 185, 129, 0.30); font-size: 11px; "
-                "padding: 1px 6px; border-radius: 4px;"
-            )
-            hdr.addWidget(lbl_rec)
-
         # 多候选图切换胶囊按钮组
         if self.candidates and len(self.candidates) > 1:
             lbl_cand_tip = QLabel("切换副本:")
@@ -2560,52 +2551,30 @@ class ViewportUnit(QFrame):
 
         key_num = self.display_key_num if self.display_key_num > 0 else (self.index_in_group + 1)
         self.btn_keep = QPushButton(f" 保留 ({key_num})")
-        self.btn_keep.setIcon(LucideIcon.icon("check", 14, "#10b981" if self.is_recommended else "#a1a1aa"))
+        self.btn_keep.setIcon(LucideIcon.icon("check", 14, "#a1a1aa"))
         self.btn_keep.setFixedHeight(34)
         self.btn_keep.setCursor(Qt.PointingHandCursor)
         self.btn_keep.setToolTip(f"保留此图并自动移除同组其余重复项 (快捷键 {key_num})")
-
-        if self.is_recommended:
-            self.btn_keep.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(16, 185, 129, 0.12);
-                    color: #10b981;
-                    border: 1px solid rgba(16, 185, 129, 0.35);
-                    border-radius: 6px;
-                    font-size: 12px;
-                    font-weight: 600;
-                }
-                QPushButton:hover {
-                    background-color: rgba(16, 185, 129, 0.22);
-                    border-color: #10b981;
-                }
-                QPushButton:disabled {
-                    background-color: #18181b;
-                    color: #52525b;
-                    border-color: rgba(255, 255, 255, 0.05);
-                }
-            """)
-        else:
-            self.btn_keep.setStyleSheet("""
-                QPushButton {
-                    background-color: #27272a;
-                    color: #d4d4d8;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 6px;
-                    font-size: 12px;
-                    font-weight: 500;
-                }
-                QPushButton:hover {
-                    background-color: rgba(16, 185, 129, 0.14);
-                    color: #10b981;
-                    border-color: rgba(16, 185, 129, 0.35);
-                }
-                QPushButton:disabled {
-                    background-color: #18181b;
-                    color: #52525b;
-                    border-color: rgba(255, 255, 255, 0.05);
-                }
-            """)
+        self.btn_keep.setStyleSheet("""
+            QPushButton {
+                background-color: #27272a;
+                color: #e4e4e7;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: rgba(16, 185, 129, 0.16);
+                border-color: rgba(16, 185, 129, 0.40);
+                color: #10b981;
+            }
+            QPushButton:disabled {
+                background-color: #18181b;
+                color: #52525b;
+                border-color: rgba(255, 255, 255, 0.05);
+            }
+        """)
         self.btn_keep.clicked.connect(lambda: self.keepRequested.emit(self.item))
         act_row.addWidget(self.btn_keep, stretch=2)
 
@@ -4548,14 +4517,15 @@ class DedupMainWindow(QMainWindow):
         if not active:
             active = grp.items
 
-        best_item = max(active, key=lambda it: (it.pixel_count, it.filesize)) if active else (grp.items[0] if grp.items else None)
-
         has_multi = len(grp.items) > 2
         self.btn_cap_grid.setVisible(has_multi)
         self.btn_cap_single_col.setVisible(has_multi)
 
-        # 候选项列表：除推荐项之外的其他所有图片
-        candidates = [(i, it) for i, it in enumerate(grp.items) if best_item is None or it.unique_key != best_item.unique_key]
+        # 严格锁定：基准原始图永远固定为组内第0项（文件夹1 / 原始图 A），杜绝跨文件夹交叉对比时位置互换导致误删
+        ref_item = grp.items[0] if grp.items else None
+
+        # 对比图候选列表：除原始图 A 之外的所有副本图片 (index >= 1)
+        candidates = [(i, it) for i, it in enumerate(grp.items) if i > 0]
         candidate_indices = [i for i, _ in candidates]
 
         if not candidate_indices:
@@ -4566,7 +4536,6 @@ class DedupMainWindow(QMainWindow):
 
         cand_idx = self.current_candidate_idx
         cand_item = grp.items[cand_idx] if cand_idx < len(grp.items) else (grp.items[1] if len(grp.items) > 1 else grp.items[0])
-        ref_item = best_item if best_item else grp.items[0]
 
         # 1. 滑动卷帘对比模式 (精准比对 基准原图 vs 当前选中对比图)
         if self.btn_cap_curtain.isChecked() and len(active) >= 2:
@@ -4574,7 +4543,7 @@ class DedupMainWindow(QMainWindow):
             pix_b = load_qpixmap_safe(cand_item.filepath)
             curtain = CurtainCompareWidget(pix_a, pix_b, ref_item.filename, cand_item.filename)
             self.viewport_layout.addWidget(curtain, 0, 0, 1, 2)
-            self.lbl_dock_shortcuts.setText("左右拖拽滑块对比  |  Delete 废弃非推荐  |  Space 白名单  |  Ctrl+Z 撤销")
+            self.lbl_dock_shortcuts.setText("左右拖拽滑块对比  |  Delete 废弃对比图  |  Space 白名单  |  Ctrl+Z 撤销")
             self.right_inspector.update_group(grp, item_a=ref_item, item_b=cand_item)
             return
 
@@ -4584,11 +4553,10 @@ class DedupMainWindow(QMainWindow):
 
         if (is_grid_2col or is_single_col) and has_multi:
             for idx, item in enumerate(grp.items):
-                is_rec = (best_item is not None and item.unique_key == best_item.unique_key)
                 unit = ViewportUnit(
                     index_in_group=idx,
                     item=item,
-                    is_recommended=is_rec,
+                    is_recommended=False,
                     parent=self.viewport_container,
                     display_key_num=idx + 1,
                     single_column=is_single_col,
@@ -4621,13 +4589,12 @@ class DedupMainWindow(QMainWindow):
             self.right_inspector.update_group(grp, item_a=ref_item, item_b=cand_item)
             return
 
-        # 3. 标准双视口聚焦对比模式 (默认：左侧原始推荐原图 vs 右侧当前选中的对比图)
-        self.lbl_dock_shortcuts.setText("1 保留A  |  2 保留B  |  Space 白名单  |  Delete 废弃其余副本  |  双击放大全屏  |  Ctrl+Z 撤销")
-        ref_idx = grp.items.index(ref_item) if ref_item in grp.items else 0
+        # 3. 标准双视口聚焦对比模式 (左侧固定为原始基准图 A vs 右侧固定为当前选中的对比图 B/C...)
+        self.lbl_dock_shortcuts.setText("1 保留左图 (A)  |  2 保留右图 (B)  |  Delete 废弃对比图  |  Space 白名单  |  双击放大全屏  |  Ctrl+Z 撤销")
         unit_a = ViewportUnit(
-            index_in_group=ref_idx,
+            index_in_group=0,
             item=ref_item,
-            is_recommended=True,
+            is_recommended=False,
             parent=self.viewport_container,
             display_key_num=1,
             is_grid_mode=False
@@ -4710,7 +4677,7 @@ class DedupMainWindow(QMainWindow):
     # ==================== 纯键盘流水线作业与安全可逆操作 ====================
 
     def _bind_shortcuts(self):
-        # 1~9 保留对应单图 | Space 白名单 | Delete 废弃非推荐项 | Ctrl+Z 撤销 | 左右方向键翻组 | F1 帮助指南
+        # 1~9 保留对应单图 | Space 白名单 | Delete 废弃对比图 | Ctrl+Z 撤销 | 左右方向键翻组 | F1 帮助指南
         for digit in range(1, 10):
             QShortcut(QKeySequence(str(digit)), self).activated.connect(lambda d=digit - 1: self._keep_by_index(d))
         QShortcut(QKeySequence(Qt.Key_Space), self).activated.connect(self._whitelist_current_group)
@@ -4726,10 +4693,10 @@ class DedupMainWindow(QMainWindow):
         grp = self.current_group
         is_tiled = (self.btn_cap_grid.isChecked() or self.btn_cap_single_col.isChecked()) and len(grp.items) > 2
         if not is_tiled:
-            # 双视口聚焦模式：1 保留左图 (A/参考图)，2 保留当前右图 (选中的对比图)
+            # 双视口聚焦模式：1 严格保留左图 (原始图 A)，2 严格保留右图 (当前选中的对比图)
             if key_num == 0:
-                best_item = max(grp.active_items, key=lambda it: (it.pixel_count, it.filesize)) if grp.active_items else grp.items[0]
-                self._on_keep_only_item(best_item)
+                if grp.items and not grp.items[0].deleted:
+                    self._on_keep_only_item(grp.items[0])
             elif key_num == 1:
                 cand_idx = self.current_candidate_idx
                 if 0 <= cand_idx < len(grp.items):
@@ -4744,13 +4711,13 @@ class DedupMainWindow(QMainWindow):
                     self._on_keep_only_item(target)
 
     def _discard_non_recommended(self):
-        """按 Delete 键：自动保留智能推荐项并废弃其余重复项"""
+        """按 Delete 键：保留左侧原始图 (A)，并废弃其余重复对比图"""
         if self.phase_stack.currentIndex() != self.PHASE_REVIEW or not self.current_group:
             return
-        active = self.current_group.active_items
-        if len(active) >= 2:
-            best = max(active, key=lambda it: (it.pixel_count, it.filesize))
-            self._on_keep_only_item(best)
+        if self.current_group.items:
+            ref = self.current_group.items[0]
+            if not ref.deleted:
+                self._on_keep_only_item(ref)
 
     def _on_delete_single_item(self, item: ImageItem):
         if not self.current_group or item.deleted:
@@ -4995,9 +4962,9 @@ class DedupMainWindow(QMainWindow):
 
             <h3 style="color: #a78bfa; margin-top: 6px; margin-bottom: 6px;">四、纯键盘流水线快捷键一览</h3>
             <p style="margin-top: 0; margin-bottom: 12px;">
-                • 按 <b>[1]</b>：仅保留左图 A（自动软删除同组其余图片）<br/>
-                • 按 <b>[2]</b>：仅保留右图 B（自动软删除同组其余图片）<br/>
-                • 按 <b>[Delete]</b>：采纳系统智能推荐（保留分辨率/体积最优原图，软删除其余重复项）<br/>
+                • 按 <b>[1]</b>：仅保留左侧原始图 A（自动软删除同组其余对比图片）<br/>
+                • 按 <b>[2]</b>：仅保留右侧对比图 B（自动软删除同组其余图片）<br/>
+                • 按 <b>[Delete]</b>：保留左侧原始图 A，快速废弃右侧对比图副本<br/>
                 • 按 <b>[Space 空格键]</b>：将当前组加入保留白名单（或移出白名单）<br/>
                 • 按 <b>[Ctrl + Z]</b>：原路径无损撤销上一步删除操作<br/>
                 • 按 <b>[← / → 左右方向键]</b>：切换上一组 / 下一组  |  按 <b>[F1]</b>：打开本帮助中心

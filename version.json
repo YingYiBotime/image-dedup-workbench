@@ -1,15 +1,15 @@
 {
-  "version": "4.1.0",
-  "published_at": "2026-10-13 20:10:40",
+  "version": "4.1.1",
+  "published_at": "2026-10-15 12:50:35",
   "hotpatch_files": {
-    "app.py": "73aaafd2affcc76518fb00408d75415888614c64e1be5c67c730719031764d01",
+    "app.py": "18b0ced0dab367e7c1128f6762dd85a0bf1997c7afb5445fa88342100a372f92",
     "engine.py": "9d53f9681d146e2da83104497fbf8268738881d5861dbf992e12aac40f9dc77e",
-    "core_infra.py": "198331a35fd8c78c2ae7458a233ede29d56e2eafae3eb42a1d80304339098249",
+    "core_infra.py": "ade9a090b3809dfc971b3ed983ed7df35a5fd4f1da613994850fbeba14161dc6",
     "generate_icon.py": "78f74c68853a8f57856f45c1e4f759c33d60e060336a80655c09f105c104bb35",
     "github_ota_config.json": "1dd58c6aae5ebb6933471858809869312d77d4d064f7f428820f5ea1410b2dab"
   },
-  "hotpatch_size_kb": 338.4,
-  "hotpatch_sha256": "7db226b0d6e267c220024ac7cbd9db97de5a446ef38983dea474c79213daf9cd",
-  "hotpatch_rsa_sig": "PWbxmqX8g_Gaao-o0B-4OCVCp-JrIYih37fYJo6j5qTAqOvdIhe2--FRqq8epAL0bPtbI3hVB4ljzU7Fe6T9-C7eejFpy8RY-x_H99DZa7FdfDAVT4nha40hYoyROZwxOaX2_R_Pd8MIg-neePxpKQloy07hdezvhgXd-4opHiU7mRClEFsc7VycU8EiM60g6nbCL2WsJFG3gweS2eFiHBwVdxPQ9txI6qSK31GudbXRHkVR_ybfErfWF0NsmPdKbC0at6MAeI-_jcJNk3cyRy1hdFZucLisTQZwTdZosJ5BNoEEGPEO3c7IuP-Cacn_uvLLHS1X7hibl_4dcAitGw",
-  "notes": "重构双级视口高分位图缓存池与后台相邻组异步预加载，实现模式切换与翻组零延迟瞬切；重构左侧导航列表局部增量刷新与空闲防抖GC，彻底消灭删除保留卡顿"
+  "hotpatch_size_kb": 336.9,
+  "hotpatch_sha256": "edd7af3782813f0b6f7ba6ebd5a0582fc69ff0a33bd3016dab8517e472cf1590",
+  "hotpatch_rsa_sig": "PV8KC3sCjja8dk4Qj5sqlnit32VarUyppKCvyWRd1ER_vKSxWR9YnIBJcN8zuFnGzsDhMVolSx9qunVmdi7aDWm9ZS-Hj7jOC6bgB9ZZr2GPY0jWNgospR2w39dio1kRr7yoNSHVOO-csC5Evoo7TXNl3kuxTVGUdsLONKeas8QWW06bpXHTROdQYkAQvV6hCiy0mF18aQv9Y82Lzel7i2NrAULw9XtzTnJghbHVN8eNgAmt_YOOLux_65eP59NTjwlKmMxE4raloRaoax-yD4gisk-gsS8Fh58pmlpk9SNBuJroz0ZJG-uDJwI0AEW0UnZcT7CVy7MJf1MwqiFsQg",
+  "notes": "取消智能推荐保留功能，固定左侧为原始图A右侧为对比图B彻底杜绝误删"
 }
