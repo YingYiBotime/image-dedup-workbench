@@ -56,7 +56,7 @@ def _bootstrap_hotpatch():
     """启动时检查 %LOCALAPPDATA%\\TableclothDedupPro\\hotpatch 下是否有更新的云端热补丁并无缝接管"""
     if getattr(sys, "_tdpro_hotpatch_bootstrapped", False):
         return
-    builtin_version = "4.1.1"
+    builtin_version = "4.1.2"
     local_base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~\\AppData\\Local")
     hp_dir = os.path.join(local_base, "TableclothDedupPro", "hotpatch")
     hp_manifest = os.path.join(hp_dir, "hotpatch_manifest.json")
@@ -300,6 +300,29 @@ class LucideIcon:
             p.drawLine(QPointF(m + w * 0.88, y2), QPointF(m + w * 0.12, y2))
             p.drawLine(QPointF(m + w * 0.34, y2 - w * 0.18), QPointF(m + w * 0.12, y2))
             p.drawLine(QPointF(m + w * 0.34, y2 + w * 0.18), QPointF(m + w * 0.12, y2))
+
+        elif name == "sun":
+            cx, cy = s * 0.5, s * 0.5
+            cr = w * 0.22
+            p.drawEllipse(QPointF(cx, cy), cr, cr)
+            r1 = cr + w * 0.08
+            r2 = r1 + w * 0.16
+            for deg in (0, 45, 90, 135, 180, 225, 270, 315):
+                rad = math.radians(deg)
+                p.drawLine(
+                    QPointF(cx + r1 * math.cos(rad), cy + r1 * math.sin(rad)),
+                    QPointF(cx + r2 * math.cos(rad), cy + r2 * math.sin(rad)),
+                )
+
+        elif name == "moon":
+            cx, cy = s * 0.5, s * 0.5
+            mr = w * 0.40
+            path = QPainterPath()
+            path.moveTo(cx + mr * 0.12, cy - mr)
+            path.arcTo(QRectF(cx - mr, cy - mr, 2 * mr, 2 * mr), 80, 200)
+            path.arcTo(QRectF(cx - mr * 0.35, cy - mr * 0.9, 1.4 * mr, 1.8 * mr), 280, -200)
+            path.closeSubpath()
+            p.drawPath(path)
 
         p.end()
         return px
@@ -569,16 +592,16 @@ class NeighborPrefetchWorker(QThread):
         self.wait(500)
 
 
-def make_dual_thumbnail_pixmap(path_a: str, path_b: str, w: int = 56, h: int = 32) -> QPixmap:
+def make_dual_thumbnail_pixmap(path_a: str, path_b: str, w: int = 56, h: int = 32, is_light: bool = False) -> QPixmap:
     """为左侧 260px 导航抽屉生成双图并排微型缩略图卡片（带多级内存缓存与快速解码）"""
-    cache_key = f"{path_a}|{path_b}|{w}|{h}"
+    cache_key = f"{path_a}|{path_b}|{w}|{h}|{'L' if is_light else 'D'}"
     if cache_key in _DUAL_THUMB_CACHE:
         return _DUAL_THUMB_CACHE[cache_key]
 
     dpr = 2.0
     canvas = QPixmap(int(w * dpr), int(h * dpr))
     canvas.setDevicePixelRatio(dpr)
-    canvas.fill(QColor("#18181b"))
+    canvas.fill(QColor("#ffffff" if is_light else "#18181b"))
 
     p = QPainter(canvas)
     p.setRenderHint(QPainter.Antialiasing, True)
@@ -588,6 +611,7 @@ def make_dual_thumbnail_pixmap(path_a: str, path_b: str, w: int = 56, h: int = 3
     for idx, fp in enumerate((path_a, path_b)):
         x = idx * (half_w + 2)
         rect = QRectF(x, 0, half_w, h)
+        placeholder_bg = QColor("#f4f4f5") if is_light else QColor("#27272a")
         if fp and os.path.exists(fp):
             px = get_fast_thumbnail(fp, half_w * 2, h * 2)
             if not px.isNull():
@@ -598,10 +622,11 @@ def make_dual_thumbnail_pixmap(path_a: str, path_b: str, w: int = 56, h: int = 3
                 p.drawPixmap(rect.toRect(), px)
                 p.restore()
             else:
-                p.fillRect(rect, QColor("#27272a"))
+                p.fillRect(rect, placeholder_bg)
         else:
-            p.fillRect(rect, QColor("#27272a"))
-        p.setPen(QPen(QColor(255, 255, 255, 22), 1.0))
+            p.fillRect(rect, placeholder_bg)
+        border_pen = QPen(QColor(0, 0, 0, 20) if is_light else QColor(255, 255, 255, 22), 1.0)
+        p.setPen(border_pen)
         p.drawRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), 3.0, 3.0)
 
     p.end()
@@ -675,6 +700,7 @@ class SegmentedControl(QFrame):
         self._is_cross = False
         self._slide_progress = 0.0  # 0.0 = 单文件夹, 1.0 = 跨文件夹
         self._glow_progress = 0.0   # 切换瞬间的描边呼吸高光
+        self._theme = "dark"
 
         for btn in (self.btn_single, self.btn_cross):
             btn.setFixedHeight(26)
@@ -694,6 +720,11 @@ class SegmentedControl(QFrame):
         self.btn_single.clicked.connect(lambda: self.set_cross_mode(False))
         self.btn_cross.clicked.connect(lambda: self.set_cross_mode(True))
         self._refresh_style()
+
+    def set_theme(self, theme: str):
+        self._theme = theme
+        self._refresh_style()
+        self.update()
 
     @property
     def is_cross(self) -> bool:
@@ -727,6 +758,7 @@ class SegmentedControl(QFrame):
             self.modeChanged.emit(self._is_cross)
 
     def _refresh_style(self):
+        is_light = (self._theme == "light")
         active_css = """
             QPushButton {
                 background-color: transparent;
@@ -738,21 +770,38 @@ class SegmentedControl(QFrame):
                 border: none;
             }
         """
-        idle_css = """
-            QPushButton {
-                background-color: transparent;
-                color: #a1a1aa;
-                font-size: 12px;
-                font-weight: 400;
-                border-radius: 4px;
-                padding: 0 12px;
-                border: none;
-            }
-            QPushButton:hover {
-                color: #f4f4f5;
-                background-color: rgba(255, 255, 255, 0.04);
-            }
-        """
+        if is_light:
+            idle_css = """
+                QPushButton {
+                    background-color: transparent;
+                    color: #71717a;
+                    font-size: 12px;
+                    font-weight: 400;
+                    border-radius: 4px;
+                    padding: 0 12px;
+                    border: none;
+                }
+                QPushButton:hover {
+                    color: #18181b;
+                    background-color: rgba(0, 0, 0, 0.05);
+                }
+            """
+        else:
+            idle_css = """
+                QPushButton {
+                    background-color: transparent;
+                    color: #a1a1aa;
+                    font-size: 12px;
+                    font-weight: 400;
+                    border-radius: 4px;
+                    padding: 0 12px;
+                    border: none;
+                }
+                QPushButton:hover {
+                    color: #f4f4f5;
+                    background-color: rgba(255, 255, 255, 0.04);
+                }
+            """
         self.btn_single.setStyleSheet(idle_css if self._is_cross else active_css)
         self.btn_cross.setStyleSheet(active_css if self._is_cross else idle_css)
         self.update()
@@ -762,16 +811,25 @@ class SegmentedControl(QFrame):
         p.setRenderHint(QPainter.Antialiasing, True)
 
         outer = QRectF(0.5, 0.5, self.width() - 1.0, self.height() - 1.0)
-        p.setBrush(QColor("#18181b"))
+        is_light = (self._theme == "light")
+        p.setBrush(QColor("#e4e4e7" if is_light else "#18181b"))
 
         # 外框描边随切换产生微光呼吸过渡
         g = self._glow_progress
-        border_col = QColor(
-            int(255 * (1 - g) + 59 * g),
-            int(255 * (1 - g) + 130 * g),
-            int(255 * (1 - g) + 246 * g),
-            int(20 + 145 * g)
-        )
+        if is_light:
+            border_col = QColor(
+                int(212 * (1 - g) + 59 * g),
+                int(212 * (1 - g) + 130 * g),
+                int(216 * (1 - g) + 246 * g),
+                int(160 + 95 * g)
+            )
+        else:
+            border_col = QColor(
+                int(255 * (1 - g) + 59 * g),
+                int(255 * (1 - g) + 130 * g),
+                int(255 * (1 - g) + 246 * g),
+                int(20 + 145 * g)
+            )
         p.setPen(QPen(border_col, 1.0))
         p.drawRoundedRect(outer, 6.0, 6.0)
 
@@ -801,6 +859,7 @@ class CompactPathInput(QPushButton):
         self.slot_index = slot_index
         self.placeholder = placeholder
         self._path = ""
+        self.theme = "dark"
 
         self.setFixedHeight(32)
         self.setMinimumWidth(176)
@@ -812,6 +871,10 @@ class CompactPathInput(QPushButton):
         self.clicked.connect(self._on_clicked)
         self._update_appearance()
 
+    def set_theme(self, theme: str):
+        self.theme = theme
+        self._update_appearance()
+
     @property
     def path(self) -> str:
         return self._path
@@ -821,59 +884,108 @@ class CompactPathInput(QPushButton):
         self._update_appearance()
 
     def _update_appearance(self, drag_active: bool = False):
+        is_light = (getattr(self, "theme", "dark") == "light")
         if drag_active:
             self.setIcon(LucideIcon.icon("folder", 15, "#2563eb"))
-            self.setStyleSheet("""
-                QPushButton {
-                    background-color: #202023;
-                    border: 1px solid #2563eb;
-                    border-radius: 6px;
-                    color: #f4f4f5;
-                    font-size: 12px;
-                    padding: 0 10px;
-                    text-align: left;
-                }
-            """)
+            if is_light:
+                self.setStyleSheet("""
+                    QPushButton {
+                        background-color: #eff6ff;
+                        border: 1px solid #2563eb;
+                        border-radius: 6px;
+                        color: #1e3a8a;
+                        font-size: 12px;
+                        padding: 0 10px;
+                        text-align: left;
+                    }
+                """)
+            else:
+                self.setStyleSheet("""
+                    QPushButton {
+                        background-color: #202023;
+                        border: 1px solid #2563eb;
+                        border-radius: 6px;
+                        color: #f4f4f5;
+                        font-size: 12px;
+                        padding: 0 10px;
+                        text-align: left;
+                    }
+                """)
             return
 
         if self._path and os.path.isdir(self._path):
-            self.setIcon(LucideIcon.icon("folder", 15, "#a1a1aa"))
+            self.setIcon(LucideIcon.icon("folder", 15, "#52525b" if is_light else "#a1a1aa"))
             self.setText(f" {shorten_path(self._path, 24)}")
             self.setToolTip(f"{self._path}\n点击更换目录，或直接拖入新文件夹")
-            self.setStyleSheet("""
-                QPushButton {
-                    background-color: #18181b;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 6px;
-                    color: #e4e4e7;
-                    font-size: 12px;
-                    padding: 0 10px;
-                    text-align: left;
-                }
-                QPushButton:hover {
-                    background-color: #27272a;
-                    border-color: rgba(255, 255, 255, 0.16);
-                }
-            """)
+            if is_light:
+                self.setStyleSheet("""
+                    QPushButton {
+                        background-color: #ffffff;
+                        border: 1px solid #d4d4d8;
+                        border-radius: 6px;
+                        color: #18181b;
+                        font-size: 12px;
+                        padding: 0 10px;
+                        text-align: left;
+                    }
+                    QPushButton:hover {
+                        background-color: #f4f4f5;
+                        border-color: #a1a1aa;
+                    }
+                """)
+            else:
+                self.setStyleSheet("""
+                    QPushButton {
+                        background-color: #18181b;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 6px;
+                        color: #e4e4e7;
+                        font-size: 12px;
+                        padding: 0 10px;
+                        text-align: left;
+                    }
+                    QPushButton:hover {
+                        background-color: #27272a;
+                        border-color: rgba(255, 255, 255, 0.16);
+                    }
+                """)
         else:
-            self.setIcon(LucideIcon.icon("folder", 15, "#71717a"))
+            self.setIcon(LucideIcon.icon("folder", 15, "#a1a1aa" if is_light else "#71717a"))
             self.setText(f" {self.placeholder}")
             self.setToolTip("点击浏览文件夹，或直接拖入文件夹")
-            self.setStyleSheet("""
-                QPushButton {
-                    background-color: #18181b;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 6px;
-                    color: #71717a;
-                    font-size: 12px;
-                    padding: 0 10px;
-                    text-align: left;
-                }
-                QPushButton:hover {
-                    background-color: #27272a;
-                    color: #a1a1aa;
-                }
-            """)
+            if is_light:
+                self.setStyleSheet("""
+                    QPushButton {
+                        background-color: #ffffff;
+                        border: 1px solid #e4e4e7;
+                        border-radius: 6px;
+                        color: #71717a;
+                        font-size: 12px;
+                        padding: 0 10px;
+                        text-align: left;
+                    }
+                    QPushButton:hover {
+                        background-color: #f4f4f5;
+                        color: #18181b;
+                        border-color: #d4d4d8;
+                    }
+                """)
+            else:
+                self.setStyleSheet("""
+                    QPushButton {
+                        background-color: #18181b;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 6px;
+                        color: #71717a;
+                        font-size: 12px;
+                        padding: 0 10px;
+                        text-align: left;
+                    }
+                    QPushButton:hover {
+                        background-color: #27272a;
+                        color: #a1a1aa;
+                    }
+                """)
 
     def _on_clicked(self):
         start_dir = self._path if os.path.isdir(self._path) else os.path.expanduser("~\\Desktop")
@@ -985,6 +1097,7 @@ class SensitivitySelector(QToolButton):
         super().__init__(parent)
         self._current_key = "standard"
         self._pulse_val = 0.0
+        self.theme = "dark"
         self.setFixedHeight(32)
         self.setCursor(Qt.PointingHandCursor)
         self.setPopupMode(QToolButton.InstantPopup)
@@ -1023,6 +1136,35 @@ class SensitivitySelector(QToolButton):
         self.setMenu(self._menu)
         self._rebuild_menu()
         self._update_button_label()
+
+    def set_theme(self, theme: str):
+        self.theme = theme
+        is_light = (theme == "light")
+        self.setStyleSheet(f"""
+            QToolButton {{
+                background-color: transparent;
+                border: none;
+                border-radius: 6px;
+                padding: 0 12px 0 22px;
+                color: {'#18181b' if is_light else '#e4e4e7'};
+                font-size: 12px;
+                font-weight: 500;
+            }}
+            QToolButton:hover {{
+                color: {'#000000' if is_light else '#ffffff'};
+            }}
+            QToolButton::menu-indicator {{ image: none; }}
+        """)
+        self._menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {'#ffffff' if is_light else '#202023'};
+                border: 1px solid {'#e4e4e7' if is_light else 'rgba(255, 255, 255, 0.12)'};
+                border-radius: 8px;
+                padding: 8px;
+            }}
+        """)
+        self._rebuild_menu()
+        self.update()
 
     @property
     def current_key(self) -> str:
@@ -1063,10 +1205,14 @@ class SensitivitySelector(QToolButton):
         r, g, b = spec["accent_rgb"]
         pulse = self._pulse_val
         hovered = self.underMouse()
+        is_light = (getattr(self, "theme", "dark") == "light")
 
         rect = QRectF(0.5, 0.5, self.width() - 1.0, self.height() - 1.0)
 
-        bg_base = QColor("#27272a") if hovered else QColor("#18181b")
+        if is_light:
+            bg_base = QColor("#e4e4e7") if hovered else QColor("#ffffff")
+        else:
+            bg_base = QColor("#27272a") if hovered else QColor("#18181b")
         p.setBrush(bg_base)
         p.setPen(Qt.NoPen)
         p.drawRoundedRect(rect, 6.0, 6.0)
@@ -1076,7 +1222,9 @@ class SensitivitySelector(QToolButton):
             p.drawRoundedRect(rect, 6.0, 6.0)
 
         border_alpha = int(38 + 180 * pulse) if pulse > 0.01 else (48 if hovered else 24)
-        border_col = QColor(r, g, b, border_alpha) if pulse > 0.01 else QColor(255, 255, 255, border_alpha)
+        border_col = QColor(r, g, b, border_alpha) if pulse > 0.01 else (
+            QColor(0, 0, 0, border_alpha) if is_light else QColor(255, 255, 255, border_alpha)
+        )
         p.setBrush(Qt.NoBrush)
         p.setPen(QPen(border_col, 1.2 if pulse > 0.15 else 1.0))
         p.drawRoundedRect(rect, 6.0, 6.0)
@@ -1102,6 +1250,7 @@ class SensitivitySelector(QToolButton):
         c_layout = QVBoxLayout(container)
         c_layout.setContentsMargins(4, 4, 4, 4)
         c_layout.setSpacing(6)
+        is_light = (getattr(self, "theme", "dark") == "light")
 
         hdr = QLabel("选择图像查重灵敏度（点击立即切换）")
         hdr.setStyleSheet("color: #71717a; font-size: 11px; font-weight: 600; padding: 2px 4px; border: none;")
@@ -1114,8 +1263,9 @@ class SensitivitySelector(QToolButton):
             card = QFrame()
             card.setFixedWidth(368)
             card.setCursor(Qt.PointingHandCursor)
-            border_col = accent_hex if is_sel else "rgba(255, 255, 255, 0.06)"
-            bg_col = f"rgba({r}, {g}, {b}, 0.12)" if is_sel else "#18181b"
+            border_col = accent_hex if is_sel else ("#e4e4e7" if is_light else "rgba(255, 255, 255, 0.06)")
+            bg_col = f"rgba({r}, {g}, {b}, 0.12)" if is_sel else ("#f8fafc" if is_light else "#18181b")
+            hover_bg = "#f1f5f9" if is_light else "#27272a"
             card.setStyleSheet(f"""
                 QFrame {{
                     background-color: {bg_col};
@@ -1123,8 +1273,8 @@ class SensitivitySelector(QToolButton):
                     border-radius: 6px;
                 }}
                 QFrame:hover {{
-                    background-color: #27272a;
-                    border-color: {accent_hex if is_sel else "rgba(255, 255, 255, 0.20)"};
+                    background-color: {hover_bg};
+                    border-color: {accent_hex if is_sel else ("#cbd5e1" if is_light else "rgba(255, 255, 255, 0.20)")};
                 }}
             """)
             card_lay = QVBoxLayout(card)
@@ -1140,8 +1290,9 @@ class SensitivitySelector(QToolButton):
             title_row.addWidget(dot_lbl)
 
             lbl_t = QLabel(spec["title"])
+            lbl_t_color = accent_hex if is_sel else ('#18181b' if is_light else '#f4f4f5')
             lbl_t.setStyleSheet(
-                f"color: {accent_hex if is_sel else '#f4f4f5'}; font-size: 12px; font-weight: 600; background: transparent; border: none;"
+                f"color: {lbl_t_color}; font-size: 12px; font-weight: 600; background: transparent; border: none;"
             )
             title_row.addWidget(lbl_t)
             title_row.addStretch(1)
@@ -1158,7 +1309,8 @@ class SensitivitySelector(QToolButton):
 
             lbl_d = QLabel(spec["desc"])
             lbl_d.setWordWrap(True)
-            lbl_d.setStyleSheet("color: #d4d4d8; font-size: 11px; line-height: 1.4; background: transparent; border: none;")
+            lbl_d_col = "#3f3f46" if is_light else "#d4d4d8"
+            lbl_d.setStyleSheet(f"color: {lbl_d_col}; font-size: 11px; line-height: 1.4; background: transparent; border: none;")
             card_lay.addWidget(lbl_d)
 
             lbl_det = QLabel(f"✓ 检出：{spec['detect_scope']}\n✗ 忽略：{spec['ignore_scope']}")
@@ -1205,6 +1357,7 @@ class SensitivityInteractiveBar(QFrame):
         self._pulse_val = 0.0       # 1.0 -> 0.0 边框语义色呼吸高光
         self._expanded = False
         self._expand_progress = 0.0  # 0.0 (收起) <-> 1.0 (展开)
+        self.theme = "dark"
 
         self.setFixedSize(600, self.COLLAPSED_H)
         self.setCursor(Qt.PointingHandCursor)
@@ -1220,9 +1373,9 @@ class SensitivityInteractiveBar(QFrame):
         top_row.setContentsMargins(0, 0, 0, 0)
         top_row.setSpacing(6)
 
-        lbl_prefix = QLabel("灵敏度档位")
-        lbl_prefix.setStyleSheet("color: #71717a; font-size: 11px; font-weight: 600; background: transparent; border: none;")
-        top_row.addWidget(lbl_prefix)
+        self.lbl_prefix = QLabel("灵敏度档位")
+        self.lbl_prefix.setStyleSheet("color: #71717a; font-size: 11px; font-weight: 600; background: transparent; border: none;")
+        top_row.addWidget(self.lbl_prefix)
 
         top_row.addSpacing(4)
 
@@ -1379,49 +1532,94 @@ class SensitivityInteractiveBar(QFrame):
         self._pulse_val = float(val)
         self.update()
 
+    def set_theme(self, theme: str):
+        self.theme = theme
+        is_light = (theme == "light")
+        if hasattr(self, "lbl_prefix"):
+            self.lbl_prefix.setStyleSheet("color: #71717a; font-size: 11px; font-weight: 600; background: transparent; border: none;")
+        if hasattr(self, "btn_expand"):
+            if is_light:
+                self.btn_expand.setStyleSheet("""
+                    QPushButton {
+                        background-color: #f4f4f5;
+                        color: #52525b;
+                        border: 1px solid #e4e4e7;
+                        border-radius: 4px;
+                        padding: 0 8px;
+                        font-size: 11px;
+                    }
+                    QPushButton:hover {
+                        background-color: #e4e4e7;
+                        color: #18181b;
+                        border-color: #d4d4d8;
+                    }
+                """)
+            else:
+                self.btn_expand.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(255, 255, 255, 0.04);
+                        color: #a1a1aa;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 4px;
+                        padding: 0 8px;
+                        font-size: 11px;
+                    }
+                    QPushButton:hover {
+                        background-color: #27272a;
+                        color: #f4f4f5;
+                        border-color: rgba(255, 255, 255, 0.18);
+                    }
+                """)
+        self._refresh_button_styles()
+        self.update()
+
     def _refresh_button_styles(self):
         spec = SENSITIVITY_SPECS[self._current_key]
         r, g, b = spec["accent_rgb"]
         accent_hex = spec["accent"]
+        is_light = (getattr(self, "theme", "dark") == "light")
 
         # 悬停在组件任意位置均弹出完整富文本逻辑卡片
         self.setToolTip(build_sensitivity_tooltip_html(self._current_key))
 
         self.lbl_badge.setText(f"● {spec['badge']}")
         self.lbl_badge.setStyleSheet(
-            f"color: {accent_hex}; background-color: rgba({r}, {g}, {b}, 0.14); "
-            f"border: 1px solid rgba({r}, {g}, {b}, 0.32); border-radius: 4px; "
+            f"color: {accent_hex}; background-color: rgba({r}, {g}, {b}, {0.18 if is_light else 0.14}); "
+            f"border: 1px solid rgba({r}, {g}, {b}, {0.45 if is_light else 0.32}); border-radius: 4px; "
             f"padding: 0 8px; font-size: 11px; font-weight: 600;"
         )
 
         for k, btn in self._btns.items():
             is_act = (k == self._current_key)
             if is_act:
-                btn.setStyleSheet("""
-                    QPushButton {
+                btn.setStyleSheet(f"""
+                    QPushButton {{
                         background: transparent;
-                        color: #ffffff;
+                        color: {'#18181b' if is_light else '#ffffff'};
                         font-size: 11px;
                         font-weight: 600;
                         padding: 0 10px;
                         border: none;
-                    }
+                    }}
                 """)
             else:
-                btn.setStyleSheet("""
-                    QPushButton {
+                hover_bg = "rgba(0, 0, 0, 0.05)" if is_light else "rgba(255, 255, 255, 0.04)"
+                hover_col = "#18181b" if is_light else "#f4f4f5"
+                idle_col = "#71717a" if is_light else "#a1a1aa"
+                btn.setStyleSheet(f"""
+                    QPushButton {{
                         background: transparent;
-                        color: #a1a1aa;
+                        color: {idle_col};
                         font-size: 11px;
                         font-weight: 400;
                         padding: 0 10px;
                         border-radius: 4px;
                         border: none;
-                    }
-                    QPushButton:hover {
-                        color: #f4f4f5;
-                        background-color: rgba(255, 255, 255, 0.04);
-                    }
+                    }}
+                    QPushButton:hover {{
+                        color: {hover_col};
+                        background-color: {hover_bg};
+                    }}
                 """)
         self.update()
 
@@ -1434,6 +1632,7 @@ class SensitivityInteractiveBar(QFrame):
         tr, tg, tb = spec["accent_rgb"]
         pr, pg, pb = self._prev_rgb
         t_prog = self._text_anim_val
+        is_light = (getattr(self, "theme", "dark") == "light")
 
         # 实时插值当前过渡颜色
         r = int(pr + (tr - pr) * t_prog)
@@ -1442,7 +1641,7 @@ class SensitivityInteractiveBar(QFrame):
         pulse = self._pulse_val
 
         outer = QRectF(0.5, 0.5, self.width() - 1.0, self.height() - 1.0)
-        p.setBrush(QColor("#202023"))
+        p.setBrush(QColor("#ffffff") if is_light else QColor("#202023"))
         p.setPen(Qt.NoPen)
         p.drawRoundedRect(outer, 8.0, 8.0)
 
@@ -1450,11 +1649,18 @@ class SensitivityInteractiveBar(QFrame):
             p.setBrush(QColor(r, g, b, int(34 * pulse)))
             p.drawRoundedRect(outer, 8.0, 8.0)
 
-        border_col = (
-            QColor(r, g, b, int(50 + 175 * pulse))
-            if pulse > 0.01
-            else QColor(255, 255, 255, 24 if self._expand_progress > 0.1 else 20)
-        )
+        if is_light:
+            border_col = (
+                QColor(r, g, b, int(60 + 175 * pulse))
+                if pulse > 0.01
+                else QColor("#e4e4e7")
+            )
+        else:
+            border_col = (
+                QColor(r, g, b, int(50 + 175 * pulse))
+                if pulse > 0.01
+                else QColor(255, 255, 255, 24 if self._expand_progress > 0.1 else 20)
+            )
         p.setBrush(Qt.NoBrush)
         p.setPen(QPen(border_col, 1.2 if pulse > 0.1 else 1.0))
         p.drawRoundedRect(outer, 8.0, 8.0)
@@ -1471,7 +1677,7 @@ class SensitivityInteractiveBar(QFrame):
             pw = b1.width() + (b2.width() - b1.width()) * frac
             pill_rect = QRectF(px, b1.y(), pw, b1.height())
 
-            p.setBrush(QColor(r, g, b, 62))
+            p.setBrush(QColor(r, g, b, 48 if is_light else 62))
             p.setPen(QPen(QColor(r, g, b, 175), 1.0))
             p.drawRoundedRect(pill_rect, 4.0, 4.0)
 
@@ -1487,7 +1693,11 @@ class SensitivityInteractiveBar(QFrame):
             p.drawText(out_rect, Qt.AlignLeft | Qt.AlignVCenter | Qt.TextWordWrap, prev_spec["desc"])
 
         p.setOpacity(max(0.05, t_prog))
-        p.setPen(QColor("#e4e4e7" if pulse > 0.2 else "#b4b4bb"))
+        if is_light:
+            text_color = QColor("#18181b" if pulse > 0.2 else "#3f3f46")
+        else:
+            text_color = QColor("#e4e4e7" if pulse > 0.2 else "#b4b4bb")
+        p.setPen(text_color)
         in_rect = QRectF(16.0, 38.0 + (1.0 - t_prog) * 14.0, self.width() - 32.0, 34.0)
         p.drawText(in_rect, Qt.AlignLeft | Qt.AlignVCenter | Qt.TextWordWrap, spec["desc"])
         p.restore()
@@ -1499,14 +1709,19 @@ class SensitivityInteractiveBar(QFrame):
             p.setClipRect(QRectF(12.0, 76.0, self.width() - 24.0, self.height() - 82.0))
 
             # 分隔细线
-            p.setPen(QPen(QColor(255, 255, 255, 18), 1.0))
+            divider_col = QColor(0, 0, 0, 18) if is_light else QColor(255, 255, 255, 18)
+            p.setPen(QPen(divider_col, 1.0))
             p.drawLine(QPointF(16.0, 78.0), QPointF(self.width() - 16.0, 78.0))
 
             dy = (1.0 - t_prog) * 8.0
+            body_col_1 = QColor("#18181b") if is_light else QColor("#d4d4d8")
+            body_col_2 = QColor("#52525b") if is_light else QColor("#a1a1aa")
+            tag_col_1 = QColor("#059669") if is_light else QColor("#10b981")
+            tag_col_2 = QColor("#d97706") if is_light else QColor("#f59e0b")
             rows = [
-                ("✓ 检出范围：", spec["detect_scope"], QColor("#10b981"), QColor("#d4d4d8"), 84.0),
-                ("✗ 自动忽略：", spec["ignore_scope"], QColor("#f59e0b"), QColor("#a1a1aa"), 118.0),
-                ("◎ 判别逻辑：", spec["scene_logic"], QColor(r, g, b), QColor("#a1a1aa"), 152.0),
+                ("✓ 检出范围：", spec["detect_scope"], tag_col_1, body_col_1, 84.0),
+                ("✗ 自动忽略：", spec["ignore_scope"], tag_col_2, body_col_2, 118.0),
+                ("◎ 判别逻辑：", spec["scene_logic"], QColor(r, g, b), body_col_2, 152.0),
             ]
             label_w = 76.0
             content_w = self.width() - 32.0 - label_w
@@ -1542,6 +1757,11 @@ class CrossConnectorBadge(QWidget):
         super().__init__(parent)
         self.setFixedSize(64, 216)
         self._progress = 0.0
+        self.theme = "dark"
+
+    def set_theme(self, theme: str):
+        self.theme = theme
+        self.update()
 
     def set_progress(self, val: float):
         self._progress = max(0.0, min(1.0, float(val)))
@@ -1553,6 +1773,7 @@ class CrossConnectorBadge(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing, True)
         p.setOpacity(self._progress)
+        is_light = (getattr(self, "theme", "dark") == "light")
 
         cx, cy = self.width() / 2.0, self.height() / 2.0 - 6.0
 
@@ -1571,7 +1792,7 @@ class CrossConnectorBadge(QWidget):
         p.scale(scale, scale)
         p.rotate(angle)
 
-        p.setBrush(QColor("#202023"))
+        p.setBrush(QColor("#ffffff") if is_light else QColor("#202023"))
         p.setPen(QPen(QColor(37, 99, 235, 160), 1.2))
         p.drawEllipse(QPointF(0, 0), 17.0, 17.0)
 
@@ -1611,6 +1832,7 @@ class StudioDropCard(QFrame):
         self._path = ""
         self._drag_hover = False
         self._pulse_val = 0.0
+        self.theme = "dark"
 
         self.setFixedSize(320, 216)
         self.setAcceptDrops(True)
@@ -1663,6 +1885,10 @@ class StudioDropCard(QFrame):
 
         self._refresh_visuals(drag_hover=False)
 
+    def set_theme(self, theme: str):
+        self.theme = theme
+        self._refresh_visuals(drag_hover=False)
+
     def _on_pulse_step(self, val):
         self._pulse_val = float(val)
         self.update()
@@ -1688,21 +1914,36 @@ class StudioDropCard(QFrame):
 
     def _refresh_visuals(self, drag_hover: bool = False):
         self._drag_hover = drag_hover
+        is_light = (getattr(self, "theme", "dark") == "light")
         self.lbl_role_badge.setText(self.role_badge)
 
         is_cross_role = ("A" in self.role_badge or "B" in self.role_badge)
         if is_cross_role:
             self.lbl_role_badge.setStyleSheet(
-                "background-color: rgba(37, 99, 235, 0.14); color: #60a5fa; "
-                "border: 1px solid rgba(59, 130, 246, 0.30); border-radius: 4px; "
+                "background-color: rgba(37, 99, 235, 0.12); color: #2563eb; "
+                "border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 4px; "
                 "padding: 1px 8px; font-size: 11px; font-weight: 600;"
             )
         else:
-            self.lbl_role_badge.setStyleSheet(
-                "background-color: #27272a; color: #a1a1aa; "
-                "border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 4px; "
-                "padding: 1px 8px; font-size: 11px; font-weight: 500;"
-            )
+            if is_light:
+                self.lbl_role_badge.setStyleSheet(
+                    "background-color: #f4f4f5; color: #52525b; "
+                    "border: 1px solid #e4e4e7; border-radius: 4px; "
+                    "padding: 1px 8px; font-size: 11px; font-weight: 500;"
+                )
+            else:
+                self.lbl_role_badge.setStyleSheet(
+                    "background-color: #27272a; color: #a1a1aa; "
+                    "border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 4px; "
+                    "padding: 1px 8px; font-size: 11px; font-weight: 500;"
+                )
+
+        self.lbl_title.setStyleSheet(
+            f"font-size: 16px; font-weight: 600; color: {'#18181b' if is_light else '#f4f4f5'}; background: transparent; border: none;"
+        )
+        self.lbl_sub.setStyleSheet(
+            "font-size: 12px; color: #71717a; background: transparent; border: none;"
+        )
 
         if drag_hover:
             self.lbl_icon.setPixmap(LucideIcon.pixmap("folder-plus", 28, "#2563eb", 1.6))
@@ -1713,7 +1954,7 @@ class StudioDropCard(QFrame):
             self.lbl_sub.setText(shorten_path(self._path, 36))
             self.setToolTip(f"{self._path}\n点击重新选择，或拖入新文件夹")
         else:
-            self.lbl_icon.setPixmap(LucideIcon.pixmap("folder-plus", 28, "#71717a", 1.5))
+            self.lbl_icon.setPixmap(LucideIcon.pixmap("folder-plus", 28, "#a1a1aa" if is_light else "#71717a", 1.5))
             self.lbl_title.setText(self.default_title)
             self.lbl_sub.setText(self.default_subtitle)
             self.setToolTip("")
@@ -1736,8 +1977,12 @@ class StudioDropCard(QFrame):
         hovered = self.underMouse()
         has_dir = bool(self._path and os.path.isdir(self._path))
         pulse = self._pulse_val
+        is_light = (getattr(self, "theme", "dark") == "light")
 
-        bg = QColor("#242428") if hovered else QColor("#202023")
+        if is_light:
+            bg = QColor("#f4f4f5") if hovered else QColor("#ffffff")
+        else:
+            bg = QColor("#242428") if hovered else QColor("#202023")
         p.setBrush(bg)
         p.setPen(Qt.NoPen)
         p.drawRoundedRect(rect, 12.0, 12.0)
@@ -1753,7 +1998,7 @@ class StudioDropCard(QFrame):
         elif has_dir:
             pen = QPen(QColor("#2563eb") if hovered else QColor(37, 99, 235, 115), 1.0, Qt.SolidLine)
         else:
-            pen = QPen(QColor(255, 255, 255, 56 if hovered else 31), 1.0, Qt.DashLine)
+            pen = QPen(QColor(0, 0, 0, 48 if hovered else 24) if is_light else QColor(255, 255, 255, 56 if hovered else 31), 1.0, Qt.DashLine)
 
         p.setBrush(Qt.NoBrush)
         p.setPen(pen)
@@ -1828,6 +2073,7 @@ class TransitionToastBanner(QWidget):
         self._enter_progress = 0.0   # 0.0 (隐藏) <-> 1.0 (在场)
         self._switch_progress = 1.0  # 每次触发从 0.0 -> 1.0 执行滚轮翻页与波纹脉冲
         self._timer_progress = 1.0   # 1.0 -> 0.0 底部停留进度流光条
+        self.theme = "dark"
 
         # 进出场动画
         self._enter_anim = QVariantAnimation(self)
@@ -1849,6 +2095,10 @@ class TransitionToastBanner(QWidget):
         self._hold_anim.setEndValue(0.0)
         self._hold_anim.valueChanged.connect(self._on_hold_step)
         self._hold_anim.finished.connect(self._on_hold_finished)
+
+    def set_theme(self, theme: str):
+        self.theme = theme
+        self.update()
 
     @property
     def title(self) -> str:
@@ -1947,15 +2197,16 @@ class TransitionToastBanner(QWidget):
         self.move(x, y)
 
     def _draw_row_content(self, p: QPainter, pill_x: float, pill_y: float, pill_w: float, pill_h: float, title: str, subtitle: str):
+        is_light = (getattr(self, "theme", "dark") == "light")
         p.setFont(QFont("Microsoft YaHei", 9, QFont.DemiBold))
-        p.setPen(QColor("#f4f4f5"))
+        p.setPen(QColor("#18181b" if is_light else "#f4f4f5"))
         fm_title = p.fontMetrics()
         tw = fm_title.horizontalAdvance(title)
         tx = pill_x + 32.0
         p.drawText(QRectF(tx, pill_y, tw + 6, pill_h), Qt.AlignLeft | Qt.AlignVCenter, title)
 
         p.setFont(QFont("Microsoft YaHei", 9))
-        p.setPen(QColor("#a1a1aa"))
+        p.setPen(QColor("#52525b" if is_light else "#a1a1aa"))
         sub_x = tx + tw + 10.0
         sub_w = max(40.0, (pill_x + pill_w) - sub_x - 16.0)
         elided_sub = p.fontMetrics().elidedText(subtitle, Qt.ElideRight, int(sub_w))
@@ -1967,6 +2218,7 @@ class TransitionToastBanner(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing, True)
         p.setOpacity(self._enter_progress)
+        is_light = (getattr(self, "theme", "dark") == "light")
 
         s = self._switch_progress
         pr, pg, pb = self._prev_rgb
@@ -1984,7 +2236,10 @@ class TransitionToastBanner(QWidget):
         rect = QRectF(pill_x, pill_y, pill_w, pill_h)
 
         # 胶囊底色与切换高光边框
-        p.setBrush(QColor(39, 39, 42, 246))
+        if is_light:
+            p.setBrush(QColor(255, 255, 255, 250))
+        else:
+            p.setBrush(QColor(39, 39, 42, 246))
         pulse_boost = int(115 * (1.0 - s))
         p.setPen(QPen(QColor(r, g, b, min(255, 140 + pulse_boost)), 1.3 if s < 0.6 else 1.0))
         p.drawRoundedRect(rect, 19.0, 19.0)
@@ -2044,6 +2299,7 @@ class GroupDrawerItemWidget(QWidget):
     def __init__(self, group: MatchGroup, parent=None):
         super().__init__(parent)
         self.group = group
+        self.theme = "dark"
         self.setFixedHeight(52)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(8, 6, 8, 6)
@@ -2092,26 +2348,35 @@ class GroupDrawerItemWidget(QWidget):
         layout.addLayout(info_col, stretch=1)
         self.update_group_state()
 
+    def set_theme(self, theme: str):
+        self.theme = theme
+        is_light = (theme == "light")
+        self.lbl_id.setStyleSheet(
+            f"color: {'#18181b' if is_light else '#f4f4f5'}; font-size: 12px; font-weight: 600; background: transparent; border: none;"
+        )
+        self.update_group_state()
+
     def update_group_state(self):
         """局部增量更新卡片状态与缩略图，0.05ms 极速响应，杜绝全列表销毁重建"""
+        is_light = (getattr(self, "theme", "dark") == "light")
         active = self.group.active_items
         items_src = active if len(active) >= 2 else self.group.items
         p_a = items_src[0].filepath if len(items_src) >= 1 else ""
         p_b = items_src[1].filepath if len(items_src) >= 2 else p_a
-        self.lbl_thumb.setPixmap(make_dual_thumbnail_pixmap(p_a, p_b, 56, 32))
+        self.lbl_thumb.setPixmap(make_dual_thumbnail_pixmap(p_a, p_b, 56, 32, is_light=is_light))
 
         if self.group.whitelisted:
             tag_text = "白名单保留"
-            tag_css = "color: #60a5fa; font-size: 11px; background: transparent; border: none;"
+            tag_css = f"color: {'#2563eb' if is_light else '#60a5fa'}; font-size: 11px; background: transparent; border: none;"
         elif len(active) <= 1:
             tag_text = "已决断"
-            tag_css = "color: #10b981; font-size: 11px; background: transparent; border: none;"
+            tag_css = f"color: {'#059669' if is_light else '#10b981'}; font-size: 11px; background: transparent; border: none;"
         else:
             short_type = "完全相同" if "MD5" in self.group.match_type else (
                 "像素同款" if "像素" in self.group.match_type else "局部变体"
             )
             tag_text = f"{short_type} · {len(active)}张"
-            tag_css = "color: #71717a; font-size: 11px; background: transparent; border: none;"
+            tag_css = f"color: #71717a; font-size: 11px; background: transparent; border: none;"
 
         self.lbl_tag.setText(tag_text)
         self.lbl_tag.setStyleSheet(tag_css)
@@ -2122,8 +2387,9 @@ class SyncZoomImageView(QGraphicsView):
     viewChanged = Signal(float, float, float)
     doubleClicked = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, theme: str = "dark"):
         super().__init__(parent)
+        self.theme = theme
         self._scene = QGraphicsScene(self)
         self.setScene(self._scene)
         self._pixmap_item = QGraphicsPixmapItem()
@@ -2137,7 +2403,8 @@ class SyncZoomImageView(QGraphicsView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setFrameShape(QFrame.NoFrame)
-        self.setStyleSheet("background-color: #18181b; border-radius: 6px;")
+        bg_col = "#f4f4f5" if theme == "light" else "#18181b"
+        self.setStyleSheet(f"background-color: {bg_col}; border-radius: 6px;")
         self.setAcceptDrops(False)
 
         self._zoom_level = 1.0
@@ -2146,6 +2413,11 @@ class SyncZoomImageView(QGraphicsView):
 
         self.horizontalScrollBar().valueChanged.connect(self._on_scroll_changed)
         self.verticalScrollBar().valueChanged.connect(self._on_scroll_changed)
+
+    def set_theme(self, theme: str):
+        self.theme = theme
+        bg_col = "#f4f4f5" if theme == "light" else "#18181b"
+        self.setStyleSheet(f"background-color: {bg_col}; border-radius: 6px;")
 
     def set_pixmap(self, pixmap: QPixmap):
         self._scene.clear()
@@ -2258,17 +2530,22 @@ class CurtainCompareWidget(QWidget):
     支持鼠标左右拖动分割线，在同一视口原位比对图 A (左) 与图 B (右) 的细节差异。
     """
 
-    def __init__(self, pix_a: QPixmap, pix_b: QPixmap, label_a: str, label_b: str, parent=None):
+    def __init__(self, pix_a: QPixmap, pix_b: QPixmap, label_a: str, label_b: str, parent=None, theme: str = "dark"):
         super().__init__(parent)
         self.pix_a = pix_a
         self.pix_b = pix_b
         self.label_a = label_a
         self.label_b = label_b
+        self.theme = theme
         self.split_ratio = 0.5
         self._dragging = False
         self.setCursor(Qt.SplitHCursor)
         self.setMinimumSize(400, 320)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def set_theme(self, theme: str):
+        self.theme = theme
+        self.update()
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:
@@ -2291,9 +2568,10 @@ class CurtainCompareWidget(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing, True)
         p.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        is_light = (getattr(self, "theme", "dark") == "light")
 
         rect = self.rect()
-        p.fillRect(rect, QColor("#18181b"))
+        p.fillRect(rect, QColor("#f4f4f5") if is_light else QColor("#18181b"))
 
         if self.pix_a.isNull() or self.pix_b.isNull():
             p.end()
@@ -2325,17 +2603,17 @@ class CurtainCompareWidget(QWidget):
         p.drawLine(split_x, oy, split_x, oy + draw_h)
 
         handle_rect = QRectF(split_x - 14, rect.height() / 2 - 14, 28, 28)
-        p.setBrush(QBrush(QColor("#27272a")))
-        p.setPen(QPen(QColor(255, 255, 255, 45), 1.0))
+        p.setBrush(QBrush(QColor("#ffffff") if is_light else QColor("#27272a")))
+        p.setPen(QPen(QColor(0, 0, 0, 45) if is_light else QColor(255, 255, 255, 45), 1.0))
         p.drawEllipse(handle_rect)
 
-        p.setPen(QColor("#f4f4f5"))
+        p.setPen(QColor("#18181b") if is_light else QColor("#f4f4f5"))
         p.setFont(QFont("Segoe UI", 9, QFont.Bold))
         p.drawText(handle_rect, Qt.AlignCenter, "‹ ›")
 
         # 左右角标
         p.setFont(QFont("Microsoft YaHei", 9))
-        p.setPen(QColor("#a1a1aa"))
+        p.setPen(QColor("#52525b") if is_light else QColor("#a1a1aa"))
         p.drawText(ox + 10, oy + 22, f"A: {self.label_a}")
         p.drawText(ox + draw_w - 180, oy + 22, f"B: {self.label_b}")
 
@@ -2364,7 +2642,8 @@ class ViewportUnit(QFrame):
         current_candidate_idx: int = -1,
         display_key_num: int = -1,
         single_column: bool = False,
-        is_grid_mode: bool = False
+        is_grid_mode: bool = False,
+        theme: str = "dark"
     ):
         super().__init__(parent)
         self.index_in_group = index_in_group
@@ -2375,17 +2654,28 @@ class ViewportUnit(QFrame):
         self.display_key_num = display_key_num
         self.single_column = single_column
         self.is_grid_mode = is_grid_mode
+        self.theme = theme
         self.setObjectName("ViewportUnit")
         self._build_ui()
 
     def _build_ui(self):
-        self.setStyleSheet("""
-            QFrame#ViewportUnit {
-                background-color: #202023;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 8px;
-            }
-        """)
+        is_light = (self.theme == "light")
+        if is_light:
+            self.setStyleSheet("""
+                QFrame#ViewportUnit {
+                    background-color: #ffffff;
+                    border: 1px solid #e4e4e7;
+                    border-radius: 8px;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QFrame#ViewportUnit {
+                    background-color: #202023;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 8px;
+                }
+            """)
         # 尺寸保障：杜绝多图挤压成邮票大小，滚动浏览更加自如清晰
         if self.single_column:
             self.setMinimumHeight(520)
@@ -2406,14 +2696,20 @@ class ViewportUnit(QFrame):
         side_code = chr(ord("A") + self.index_in_group)
         role_title = f"原始图 ({side_code})" if self.index_in_group == 0 else f"对比图 ({side_code})"
         lbl_role = QLabel(role_title)
-        lbl_role.setStyleSheet("color: #e4e4e7; font-size: 12px; font-weight: 600; border: none;")
+        lbl_role.setStyleSheet(f"color: {'#18181b' if is_light else '#e4e4e7'}; font-size: 12px; font-weight: 600; border: none;")
         hdr.addWidget(lbl_role)
 
         lbl_folder = QLabel(self.item.folder_tag)
-        lbl_folder.setStyleSheet(
-            "background-color: #27272a; color: #a1a1aa; font-size: 11px; "
-            "padding: 2px 6px; border-radius: 4px; border: none;"
-        )
+        if is_light:
+            lbl_folder.setStyleSheet(
+                "background-color: #f4f4f5; color: #52525b; font-size: 11px; "
+                "padding: 2px 6px; border-radius: 4px; border: 1px solid #e4e4e7;"
+            )
+        else:
+            lbl_folder.setStyleSheet(
+                "background-color: #27272a; color: #a1a1aa; font-size: 11px; "
+                "padding: 2px 6px; border-radius: 4px; border: none;"
+            )
         hdr.addWidget(lbl_folder)
 
         # 多候选图切换胶囊按钮组
@@ -2440,21 +2736,38 @@ class ViewportUnit(QFrame):
                         }
                     """)
                 else:
-                    btn_c.setStyleSheet("""
-                        QPushButton {
-                            background-color: #27272a;
-                            color: #a1a1aa;
-                            font-size: 11px;
-                            font-weight: 500;
-                            padding: 0 8px;
-                            border: 1px solid rgba(255, 255, 255, 0.08);
-                            border-radius: 4px;
-                        }
-                        QPushButton:hover {
-                            background-color: #3f3f46;
-                            color: #f4f4f5;
-                        }
-                    """)
+                    if is_light:
+                        btn_c.setStyleSheet("""
+                            QPushButton {
+                                background-color: #f4f4f5;
+                                color: #52525b;
+                                font-size: 11px;
+                                font-weight: 500;
+                                padding: 0 8px;
+                                border: 1px solid #e4e4e7;
+                                border-radius: 4px;
+                            }
+                            QPushButton:hover {
+                                background-color: #e4e4e7;
+                                color: #18181b;
+                            }
+                        """)
+                    else:
+                        btn_c.setStyleSheet("""
+                            QPushButton {
+                                background-color: #27272a;
+                                color: #a1a1aa;
+                                font-size: 11px;
+                                font-weight: 500;
+                                padding: 0 8px;
+                                border: 1px solid rgba(255, 255, 255, 0.08);
+                                border-radius: 4px;
+                            }
+                            QPushButton:hover {
+                                background-color: #3f3f46;
+                                color: #f4f4f5;
+                            }
+                        """)
                 btn_c.clicked.connect(lambda _, ci=c_idx: self.candidateSelected.emit(ci))
                 hdr.addWidget(btn_c)
 
@@ -2463,44 +2776,64 @@ class ViewportUnit(QFrame):
         # 平铺多图时允许一键聚焦与原图 1v1 对比
         if self.is_grid_mode and self.index_in_group > 0:
             btn_focus = QPushButton(" 1v1对比")
-            btn_focus.setIcon(LucideIcon.icon("columns", 13, "#a1a1aa"))
+            btn_focus.setIcon(LucideIcon.icon("columns", 13, "#52525b" if is_light else "#a1a1aa"))
             btn_focus.setFixedHeight(24)
             btn_focus.setCursor(Qt.PointingHandCursor)
             btn_focus.setToolTip("与原图进入 1 对 1 左右大视口精细聚焦比对")
-            btn_focus.setStyleSheet("""
-                QPushButton {
-                    background-color: #27272a;
-                    color: #d4d4d8;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 4px;
-                    font-size: 11px;
-                    padding: 0 8px;
-                }
-                QPushButton:hover {
-                    background-color: #3f3f46;
-                    color: #ffffff;
-                }
-            """)
+            if is_light:
+                btn_focus.setStyleSheet("""
+                    QPushButton {
+                        background-color: #f4f4f5;
+                        color: #18181b;
+                        border: 1px solid #e4e4e7;
+                        border-radius: 4px;
+                        font-size: 11px;
+                        padding: 0 8px;
+                    }
+                    QPushButton:hover {
+                        background-color: #e4e4e7;
+                        color: #000000;
+                    }
+                """)
+            else:
+                btn_focus.setStyleSheet("""
+                    QPushButton {
+                        background-color: #27272a;
+                        color: #d4d4d8;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 4px;
+                        font-size: 11px;
+                        padding: 0 8px;
+                    }
+                    QPushButton:hover {
+                        background-color: #3f3f46;
+                        color: #ffffff;
+                    }
+                """)
             btn_focus.clicked.connect(lambda: self.focusRequested.emit(self.index_in_group))
             hdr.addWidget(btn_focus)
 
         # 全屏巨幅检视按钮
-        btn_zoom = QPushButton()
-        btn_zoom.setIcon(LucideIcon.icon("maximize-2", 14, "#a1a1aa"))
-        btn_zoom.setFixedSize(24, 24)
-        btn_zoom.setCursor(Qt.PointingHandCursor)
-        btn_zoom.setToolTip("全屏巨幅放大检视此图 (也可直接双击图片)")
-        btn_zoom.setStyleSheet("""
-            QPushButton {
+        hover_bg = "#f4f4f5" if is_light else "#27272a"
+        hover_border = "#e4e4e7" if is_light else "rgba(255, 255, 255, 0.08)"
+        icon_btn_style = f"""
+            QPushButton {{
                 background-color: transparent;
                 border: 1px solid transparent;
                 border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #27272a;
-                border-color: rgba(255, 255, 255, 0.08);
-            }
-        """)
+            }}
+            QPushButton:hover {{
+                background-color: {hover_bg};
+                border-color: {hover_border};
+            }}
+        """
+
+        btn_zoom = QPushButton()
+        btn_zoom.setIcon(LucideIcon.icon("maximize-2", 14, "#52525b" if is_light else "#a1a1aa"))
+        btn_zoom.setFixedSize(24, 24)
+        btn_zoom.setCursor(Qt.PointingHandCursor)
+        btn_zoom.setToolTip("全屏巨幅放大检视此图 (也可直接双击图片)")
+        btn_zoom.setStyleSheet(icon_btn_style)
         btn_zoom.clicked.connect(lambda: self.lightboxRequested.emit(self.item))
         hdr.addWidget(btn_zoom)
 
@@ -2509,24 +2842,14 @@ class ViewportUnit(QFrame):
         btn_loc.setFixedSize(24, 24)
         btn_loc.setCursor(Qt.PointingHandCursor)
         btn_loc.setToolTip(f"在资源管理器中定位：{self.item.filepath}")
-        btn_loc.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                border: 1px solid transparent;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #27272a;
-                border-color: rgba(255, 255, 255, 0.08);
-            }
-        """)
+        btn_loc.setStyleSheet(icon_btn_style)
         btn_loc.clicked.connect(lambda: self.locateRequested.emit(self.item))
         hdr.addWidget(btn_loc)
 
         layout.addLayout(hdr)
 
         # 中央视口画布
-        self.canvas = SyncZoomImageView(self)
+        self.canvas = SyncZoomImageView(self, theme=self.theme)
         self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.canvas.doubleClicked.connect(lambda: self.lightboxRequested.emit(self.item))
 
@@ -2534,7 +2857,7 @@ class ViewportUnit(QFrame):
             self.canvas.set_pixmap(load_qpixmap_safe(self.item.filepath))
         else:
             ph = QPixmap(400, 400)
-            ph.fill(QColor("#18181b"))
+            ph.fill(QColor("#f4f4f5" if is_light else "#18181b"))
             p = QPainter(ph)
             p.setPen(QColor("#71717a"))
             p.setFont(QFont("Microsoft YaHei", 12))
@@ -2551,30 +2874,52 @@ class ViewportUnit(QFrame):
 
         key_num = self.display_key_num if self.display_key_num > 0 else (self.index_in_group + 1)
         self.btn_keep = QPushButton(f" 保留 ({key_num})")
-        self.btn_keep.setIcon(LucideIcon.icon("check", 14, "#a1a1aa"))
+        self.btn_keep.setIcon(LucideIcon.icon("check", 14, "#52525b" if is_light else "#a1a1aa"))
         self.btn_keep.setFixedHeight(34)
         self.btn_keep.setCursor(Qt.PointingHandCursor)
         self.btn_keep.setToolTip(f"保留此图并自动移除同组其余重复项 (快捷键 {key_num})")
-        self.btn_keep.setStyleSheet("""
-            QPushButton {
-                background-color: #27272a;
-                color: #e4e4e7;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: 500;
-            }
-            QPushButton:hover {
-                background-color: rgba(16, 185, 129, 0.16);
-                border-color: rgba(16, 185, 129, 0.40);
-                color: #10b981;
-            }
-            QPushButton:disabled {
-                background-color: #18181b;
-                color: #52525b;
-                border-color: rgba(255, 255, 255, 0.05);
-            }
-        """)
+        if is_light:
+            self.btn_keep.setStyleSheet("""
+                QPushButton {
+                    background-color: #ffffff;
+                    color: #18181b;
+                    border: 1px solid #e4e4e7;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: 500;
+                }
+                QPushButton:hover {
+                    background-color: rgba(16, 185, 129, 0.12);
+                    border-color: #10b981;
+                    color: #059669;
+                }
+                QPushButton:disabled {
+                    background-color: #f4f4f5;
+                    color: #a1a1aa;
+                    border-color: #e4e4e7;
+                }
+            """)
+        else:
+            self.btn_keep.setStyleSheet("""
+                QPushButton {
+                    background-color: #27272a;
+                    color: #e4e4e7;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: 500;
+                }
+                QPushButton:hover {
+                    background-color: rgba(16, 185, 129, 0.16);
+                    border-color: rgba(16, 185, 129, 0.40);
+                    color: #10b981;
+                }
+                QPushButton:disabled {
+                    background-color: #18181b;
+                    color: #52525b;
+                    border-color: rgba(255, 255, 255, 0.05);
+                }
+            """)
         self.btn_keep.clicked.connect(lambda: self.keepRequested.emit(self.item))
         act_row.addWidget(self.btn_keep, stretch=2)
 
@@ -2583,26 +2928,48 @@ class ViewportUnit(QFrame):
         self.btn_del.setFixedHeight(34)
         self.btn_del.setCursor(Qt.PointingHandCursor)
         self.btn_del.setToolTip("仅移除此张图片 (软删除至暂存区，可按 Ctrl+Z 撤销)")
-        self.btn_del.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(239, 68, 68, 0.10);
-                color: #ef4444;
-                border: 1px solid rgba(239, 68, 68, 0.28);
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: 500;
-                padding: 0 12px;
-            }
-            QPushButton:hover {
-                background-color: rgba(239, 68, 68, 0.20);
-                border-color: #ef4444;
-            }
-            QPushButton:disabled {
-                background-color: #18181b;
-                color: #52525b;
-                border-color: rgba(255, 255, 255, 0.05);
-            }
-        """)
+        if is_light:
+            self.btn_del.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(239, 68, 68, 0.08);
+                    color: #dc2626;
+                    border: 1px solid rgba(239, 68, 68, 0.28);
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: 500;
+                    padding: 0 12px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(239, 68, 68, 0.18);
+                    border-color: #dc2626;
+                }
+                QPushButton:disabled {
+                    background-color: #f4f4f5;
+                    color: #a1a1aa;
+                    border-color: #e4e4e7;
+                }
+            """)
+        else:
+            self.btn_del.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(239, 68, 68, 0.10);
+                    color: #ef4444;
+                    border: 1px solid rgba(239, 68, 68, 0.28);
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: 500;
+                    padding: 0 12px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(239, 68, 68, 0.20);
+                    border-color: #ef4444;
+                }
+                QPushButton:disabled {
+                    background-color: #18181b;
+                    color: #52525b;
+                    border-color: rgba(255, 255, 255, 0.05);
+                }
+            """)
         self.btn_del.clicked.connect(lambda: self.deleteRequested.emit(self.item))
         act_row.addWidget(self.btn_del, stretch=1)
 
@@ -2891,6 +3258,10 @@ class AttributeInspectorPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedWidth(240)
+        self.theme = "dark"
+        self._last_group: Optional[MatchGroup] = None
+        self._last_item_a: Optional[ImageItem] = None
+        self._last_item_b: Optional[ImageItem] = None
         self.setObjectName("InspectorPanel")
         self.setStyleSheet("""
             QFrame#InspectorPanel {
@@ -2902,9 +3273,9 @@ class AttributeInspectorPanel(QFrame):
         self.main_layout.setContentsMargins(16, 16, 16, 16)
         self.main_layout.setSpacing(12)
 
-        lbl_hdr = QLabel("属性差异检视")
-        lbl_hdr.setStyleSheet("color: #f4f4f5; font-size: 13px; font-weight: 600; border: none;")
-        self.main_layout.addWidget(lbl_hdr)
+        self.lbl_hdr = QLabel("属性差异检视")
+        self.lbl_hdr.setStyleSheet("color: #f4f4f5; font-size: 13px; font-weight: 600; border: none;")
+        self.main_layout.addWidget(self.lbl_hdr)
 
         self.content_widget = QWidget()
         self.content_layout = QVBoxLayout(self.content_widget)
@@ -2913,7 +3284,33 @@ class AttributeInspectorPanel(QFrame):
         self.main_layout.addWidget(self.content_widget)
         self.main_layout.addStretch(1)
 
+    def set_theme(self, theme: str):
+        self.theme = theme
+        is_light = (theme == "light")
+        if is_light:
+            self.setStyleSheet("""
+                QFrame#InspectorPanel {
+                    background-color: #ffffff;
+                    border-left: 1px solid #e4e4e7;
+                }
+            """)
+            self.lbl_hdr.setStyleSheet("color: #18181b; font-size: 13px; font-weight: 600; border: none;")
+        else:
+            self.setStyleSheet("""
+                QFrame#InspectorPanel {
+                    background-color: #202023;
+                    border-left: 1px solid rgba(255, 255, 255, 0.08);
+                }
+            """)
+            self.lbl_hdr.setStyleSheet("color: #f4f4f5; font-size: 13px; font-weight: 600; border: none;")
+        if self._last_group:
+            self.update_group(self._last_group, self._last_item_a, self._last_item_b)
+
     def update_group(self, group: Optional[MatchGroup], item_a: Optional[ImageItem] = None, item_b: Optional[ImageItem] = None):
+        self._last_group = group
+        self._last_item_a = item_a
+        self._last_item_b = item_b
+
         while self.content_layout.count():
             child = self.content_layout.takeAt(0)
             if child.widget():
@@ -2932,22 +3329,32 @@ class AttributeInspectorPanel(QFrame):
 
         code_a = chr(ord("A") + group.items.index(a)) if a in group.items else "A"
         code_b = chr(ord("A") + group.items.index(b)) if b in group.items else "B"
+        is_light = (getattr(self, "theme", "dark") == "light")
 
         # 1. 智能预选判别结论卡片
         verdict_box = QFrame()
-        verdict_box.setStyleSheet("""
-            QFrame {
-                background-color: #18181b;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 6px;
-            }
-        """)
+        if is_light:
+            verdict_box.setStyleSheet("""
+                QFrame {
+                    background-color: #f8fafc;
+                    border: 1px solid #e4e4e7;
+                    border-radius: 6px;
+                }
+            """)
+        else:
+            verdict_box.setStyleSheet("""
+                QFrame {
+                    background-color: #18181b;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 6px;
+                }
+            """)
         v_layout = QVBoxLayout(verdict_box)
         v_layout.setContentsMargins(10, 8, 10, 8)
         v_layout.setSpacing(4)
 
         lbl_v_title = QLabel(f"相似度 {group.similarity_str} · {group.match_type}")
-        lbl_v_title.setStyleSheet("color: #e4e4e7; font-size: 11px; font-weight: 600; border: none;")
+        lbl_v_title.setStyleSheet(f"color: {'#18181b' if is_light else '#e4e4e7'}; font-size: 11px; font-weight: 600; border: none;")
         v_layout.addWidget(lbl_v_title)
 
         if a.pixel_count > b.pixel_count:
@@ -2963,14 +3370,14 @@ class AttributeInspectorPanel(QFrame):
 
         lbl_v_sub = QLabel(reason)
         lbl_v_sub.setWordWrap(True)
-        lbl_v_sub.setStyleSheet("color: #10b981; font-size: 11px; border: none;")
+        lbl_v_sub.setStyleSheet(f"color: {'#059669' if is_light else '#10b981'}; font-size: 11px; border: none;")
         v_layout.addWidget(lbl_v_sub)
 
         # 多图提示
         if len(group.items) > 2:
             tip_multi = QLabel(f"本组包含 {len(group.items)} 张同款图片\n可在顶部切换对比或按 Delete 一键清理其余副本")
             tip_multi.setWordWrap(True)
-            tip_multi.setStyleSheet("color: #60a5fa; font-size: 11px; border: none; padding-top: 4px;")
+            tip_multi.setStyleSheet(f"color: {'#2563eb' if is_light else '#60a5fa'}; font-size: 11px; border: none; padding-top: 4px;")
             v_layout.addWidget(tip_multi)
 
         self.content_layout.addWidget(verdict_box)
@@ -2991,13 +3398,22 @@ class AttributeInspectorPanel(QFrame):
 
         for attr_name, val_a, val_b, mode in rows_spec:
             block = QFrame()
-            block.setStyleSheet("""
-                QFrame {
-                    background-color: #18181b;
-                    border: 1px solid rgba(255, 255, 255, 0.06);
-                    border-radius: 6px;
-                }
-            """)
+            if is_light:
+                block.setStyleSheet("""
+                    QFrame {
+                        background-color: #f8fafc;
+                        border: 1px solid #e4e4e7;
+                        border-radius: 6px;
+                    }
+                """)
+            else:
+                block.setStyleSheet("""
+                    QFrame {
+                        background-color: #18181b;
+                        border: 1px solid rgba(255, 255, 255, 0.06);
+                        border-radius: 6px;
+                    }
+                """)
             b_lay = QVBoxLayout(block)
             b_lay.setContentsMargins(10, 8, 10, 8)
             b_lay.setSpacing(4)
@@ -3012,20 +3428,20 @@ class AttributeInspectorPanel(QFrame):
 
             if is_diff and mode in ("res", "size", "diff_warn"):
                 lbl_badge = QLabel("存在差异")
-                lbl_badge.setStyleSheet("color: #f59e0b; font-size: 10px; border: none;")
+                lbl_badge.setStyleSheet(f"color: {'#d97706' if is_light else '#f59e0b'}; font-size: 10px; border: none;")
                 hdr_row.addWidget(lbl_badge)
             b_lay.addLayout(hdr_row)
 
             # 计算 A / B 属性颜色
-            col_a, col_b = "#d4d4d8", "#d4d4d8"
+            col_a, col_b = ("#18181b", "#18181b") if is_light else ("#d4d4d8", "#d4d4d8")
             if mode == "res" and a.pixel_count != b.pixel_count:
-                col_a = "#10b981" if a.pixel_count > b.pixel_count else "#f59e0b"
-                col_b = "#10b981" if b.pixel_count > a.pixel_count else "#f59e0b"
+                col_a = ("#059669" if is_light else "#10b981") if a.pixel_count > b.pixel_count else ("#d97706" if is_light else "#f59e0b")
+                col_b = ("#059669" if is_light else "#10b981") if b.pixel_count > a.pixel_count else ("#d97706" if is_light else "#f59e0b")
             elif mode == "size" and a.filesize != b.filesize:
-                col_a = "#10b981" if a.filesize > b.filesize else "#f59e0b"
-                col_b = "#10b981" if b.filesize > a.filesize else "#f59e0b"
+                col_a = ("#059669" if is_light else "#10b981") if a.filesize > b.filesize else ("#d97706" if is_light else "#f59e0b")
+                col_b = ("#059669" if is_light else "#10b981") if b.filesize > a.filesize else ("#d97706" if is_light else "#f59e0b")
             elif mode == "diff_warn" and is_diff:
-                col_a, col_b = "#f59e0b", "#f59e0b"
+                col_a, col_b = ("#d97706", "#d97706") if is_light else ("#f59e0b", "#f59e0b")
 
             lbl_va = QLabel(f"{code_a}: {val_a}")
             lbl_va.setWordWrap(True)
@@ -3120,6 +3536,7 @@ class DedupMainWindow(QMainWindow):
         self.current_candidate_idx: int = 1
         self.worker: Optional[ScanWorker] = None
 
+        self._current_theme: str = self.engine.state_store.get_setting("theme_mode", "dark")
         self._folder1_path: str = ""
         self._folder2_path: str = ""
         self._sensitivity: str = "standard"
@@ -3132,8 +3549,8 @@ class DedupMainWindow(QMainWindow):
         self.setMinimumSize(1160, 720)
         self.setAcceptDrops(True)
 
-        self._apply_studio_dark_theme()
         self._init_ui()
+        self._apply_global_theme(self._current_theme)
         self._bind_shortcuts()
         self._switch_phase(self.PHASE_IMPORT)
 
@@ -3157,128 +3574,443 @@ class DedupMainWindow(QMainWindow):
         super().closeEvent(event)
 
     def _apply_studio_dark_theme(self):
-        self.setStyleSheet("""
-            QMainWindow, QWidget {
-                background-color: #18181b;
-                color: #e4e4e7;
-                font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
-            }
-            QPushButton, QToolButton, QComboBox {
-                outline: none;
-            }
-            QComboBox {
-                background-color: #18181b;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 6px;
-                padding: 4px 10px;
-                color: #d4d4d8;
-                font-size: 12px;
-            }
-            QComboBox:hover {
-                border-color: rgba(255, 255, 255, 0.16);
-            }
-            QComboBox QAbstractItemView {
-                background-color: #202023;
-                color: #e4e4e7;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                selection-background-color: #2563eb;
-            }
-            QLineEdit {
-                background-color: #18181b;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 6px;
-                padding: 4px 8px;
-                color: #e4e4e7;
-                font-size: 12px;
-            }
-            QLineEdit:focus {
-                border-color: #2563eb;
-            }
-            QListWidget {
-                background-color: transparent;
-                border: none;
-                outline: none;
-            }
-            QListWidget::item {
-                background-color: #18181b;
-                border: 1px solid rgba(255, 255, 255, 0.06);
-                border-radius: 6px;
-                margin-bottom: 6px;
-            }
-            QListWidget::item:hover {
-                background-color: #242428;
-                border-color: rgba(255, 255, 255, 0.12);
-            }
-            QListWidget::item:selected {
-                background-color: #27272a;
-                border: 1px solid #2563eb;
-            }
-            QMenu {
-                background-color: #202023;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 6px;
-                padding: 4px;
-                color: #e4e4e7;
-                font-size: 12px;
-            }
-            QMenu::item {
-                padding: 6px 20px 6px 12px;
-                border-radius: 4px;
-            }
-            QMenu::item:selected {
-                background-color: #2563eb;
-                color: #ffffff;
-            }
-            QScrollBar:vertical {
-                background-color: #18181b;
-                width: 12px;
-                margin: 0px;
-                border-radius: 6px;
-            }
-            QScrollBar:horizontal {
-                background-color: #18181b;
-                height: 12px;
-                margin: 0px;
-                border-radius: 6px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #52525b;
-                min-height: 36px;
-                border-radius: 5px;
-                margin: 2px;
-            }
-            QScrollBar::handle:horizontal {
-                background-color: #52525b;
-                min-width: 36px;
-                border-radius: 5px;
-                margin: 2px;
-            }
-            QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {
-                background-color: #71717a;
-            }
-            QScrollBar::handle:vertical:pressed, QScrollBar::handle:horizontal:pressed {
-                background-color: #3b82f6;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-                width: 0px;
-                height: 0px;
-                background: none;
-                border: none;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical,
-            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
-                background: none;
-            }
-            QToolTip {
-                background-color: #202023;
-                color: #e4e4e7;
-                border: 1px solid rgba(255, 255, 255, 0.16);
-                border-radius: 6px;
-                padding: 8px 10px;
-                font-size: 12px;
-            }
-        """)
+        self._apply_global_theme("dark")
+
+    def _toggle_theme(self):
+        new_theme = "light" if self._current_theme == "dark" else "dark"
+        self._apply_global_theme(new_theme)
+        mode_str = "浅色模式" if new_theme == "light" else "深色模式"
+        accent_rgb = (245, 158, 11) if new_theme == "light" else (59, 130, 246)
+        self.toast_banner.show_toast(
+            f"已切换为：{mode_str}",
+            "界面色彩已动态应用，设置已自动保存",
+            accent_rgb
+        )
+
+    def _apply_global_theme(self, theme: str):
+        self._current_theme = theme
+        is_light = (theme == "light")
+        self.engine.state_store.set_setting("theme_mode", theme)
+
+        # 1. 顶层窗口 QSS
+        if is_light:
+            self.setStyleSheet("""
+                QMainWindow, QWidget {
+                    background-color: #f4f4f5;
+                    color: #18181b;
+                    font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+                }
+                QPushButton, QToolButton, QComboBox {
+                    outline: none;
+                }
+                QComboBox {
+                    background-color: #ffffff;
+                    border: 1px solid #e4e4e7;
+                    border-radius: 6px;
+                    padding: 4px 10px;
+                    color: #18181b;
+                    font-size: 12px;
+                }
+                QComboBox:hover {
+                    border-color: #cbd5e1;
+                }
+                QComboBox QAbstractItemView {
+                    background-color: #ffffff;
+                    color: #18181b;
+                    border: 1px solid #e4e4e7;
+                    selection-background-color: #2563eb;
+                    selection-color: #ffffff;
+                }
+                QLineEdit {
+                    background-color: #ffffff;
+                    border: 1px solid #e4e4e7;
+                    border-radius: 6px;
+                    padding: 4px 8px;
+                    color: #18181b;
+                    font-size: 12px;
+                }
+                QLineEdit:focus {
+                    border-color: #2563eb;
+                }
+                QListWidget {
+                    background-color: transparent;
+                    border: none;
+                    outline: none;
+                }
+                QListWidget::item {
+                    background-color: #ffffff;
+                    border: 1px solid #e4e4e7;
+                    border-radius: 6px;
+                    margin-bottom: 6px;
+                }
+                QListWidget::item:hover {
+                    background-color: #f8fafc;
+                    border-color: #cbd5e1;
+                }
+                QListWidget::item:selected {
+                    background-color: #eff6ff;
+                    border: 1px solid #2563eb;
+                }
+                QMenu {
+                    background-color: #ffffff;
+                    border: 1px solid #e4e4e7;
+                    border-radius: 6px;
+                    padding: 4px;
+                    color: #18181b;
+                    font-size: 12px;
+                }
+                QMenu::item {
+                    padding: 6px 20px 6px 12px;
+                    border-radius: 4px;
+                }
+                QMenu::item:selected {
+                    background-color: #2563eb;
+                    color: #ffffff;
+                }
+                QScrollBar:vertical {
+                    background-color: #f4f4f5;
+                    width: 12px;
+                    margin: 0px;
+                    border-radius: 6px;
+                }
+                QScrollBar:horizontal {
+                    background-color: #f4f4f5;
+                    height: 12px;
+                    margin: 0px;
+                    border-radius: 6px;
+                }
+                QScrollBar::handle:vertical {
+                    background-color: #d4d4d8;
+                    min-height: 36px;
+                    border-radius: 5px;
+                    margin: 2px;
+                }
+                QScrollBar::handle:horizontal {
+                    background-color: #d4d4d8;
+                    min-width: 36px;
+                    border-radius: 5px;
+                    margin: 2px;
+                }
+                QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {
+                    background-color: #a1a1aa;
+                }
+                QScrollBar::handle:vertical:pressed, QScrollBar::handle:horizontal:pressed {
+                    background-color: #2563eb;
+                }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                    width: 0px;
+                    height: 0px;
+                    background: none;
+                    border: none;
+                }
+                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical,
+                QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+                    background: none;
+                }
+                QToolTip {
+                    background-color: #ffffff;
+                    color: #18181b;
+                    border: 1px solid #e4e4e7;
+                    border-radius: 6px;
+                    padding: 8px 10px;
+                    font-size: 12px;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QMainWindow, QWidget {
+                    background-color: #18181b;
+                    color: #e4e4e7;
+                    font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+                }
+                QPushButton, QToolButton, QComboBox {
+                    outline: none;
+                }
+                QComboBox {
+                    background-color: #18181b;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 6px;
+                    padding: 4px 10px;
+                    color: #d4d4d8;
+                    font-size: 12px;
+                }
+                QComboBox:hover {
+                    border-color: rgba(255, 255, 255, 0.16);
+                }
+                QComboBox QAbstractItemView {
+                    background-color: #202023;
+                    color: #e4e4e7;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    selection-background-color: #2563eb;
+                }
+                QLineEdit {
+                    background-color: #18181b;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 6px;
+                    padding: 4px 8px;
+                    color: #e4e4e7;
+                    font-size: 12px;
+                }
+                QLineEdit:focus {
+                    border-color: #2563eb;
+                }
+                QListWidget {
+                    background-color: transparent;
+                    border: none;
+                    outline: none;
+                }
+                QListWidget::item {
+                    background-color: #18181b;
+                    border: 1px solid rgba(255, 255, 255, 0.06);
+                    border-radius: 6px;
+                    margin-bottom: 6px;
+                }
+                QListWidget::item:hover {
+                    background-color: #242428;
+                    border-color: rgba(255, 255, 255, 0.12);
+                }
+                QListWidget::item:selected {
+                    background-color: #27272a;
+                    border: 1px solid #2563eb;
+                }
+                QMenu {
+                    background-color: #202023;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 6px;
+                    padding: 4px;
+                    color: #e4e4e7;
+                    font-size: 12px;
+                }
+                QMenu::item {
+                    padding: 6px 20px 6px 12px;
+                    border-radius: 4px;
+                }
+                QMenu::item:selected {
+                    background-color: #2563eb;
+                    color: #ffffff;
+                }
+                QScrollBar:vertical {
+                    background-color: #18181b;
+                    width: 12px;
+                    margin: 0px;
+                    border-radius: 6px;
+                }
+                QScrollBar:horizontal {
+                    background-color: #18181b;
+                    height: 12px;
+                    margin: 0px;
+                    border-radius: 6px;
+                }
+                QScrollBar::handle:vertical {
+                    background-color: #52525b;
+                    min-height: 36px;
+                    border-radius: 5px;
+                    margin: 2px;
+                }
+                QScrollBar::handle:horizontal {
+                    background-color: #52525b;
+                    min-width: 36px;
+                    border-radius: 5px;
+                    margin: 2px;
+                }
+                QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {
+                    background-color: #71717a;
+                }
+                QScrollBar::handle:vertical:pressed, QScrollBar::handle:horizontal:pressed {
+                    background-color: #3b82f6;
+                }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                    width: 0px;
+                    height: 0px;
+                    background: none;
+                    border: none;
+                }
+                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical,
+                QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+                    background: none;
+                }
+                QToolTip {
+                    background-color: #202023;
+                    color: #e4e4e7;
+                    border: 1px solid rgba(255, 255, 255, 0.16);
+                    border-radius: 6px;
+                    padding: 8px 10px;
+                    font-size: 12px;
+                }
+            """)
+
+        # 2. 顶栏与底栏背景与边框
+        if is_light:
+            if hasattr(self, "top_toolbar"):
+                self.top_toolbar.setStyleSheet("""
+                    QFrame#TopToolbar {
+                        background-color: #ffffff;
+                        border-bottom: 1px solid #e4e4e7;
+                    }
+                """)
+            if hasattr(self, "bottom_dock"):
+                self.bottom_dock.setStyleSheet("""
+                    QFrame#BottomDock {
+                        background-color: #ffffff;
+                        border-top: 1px solid #e4e4e7;
+                    }
+                """)
+            if hasattr(self, "left_drawer"):
+                self.left_drawer.setStyleSheet("""
+                    QFrame#LeftDrawer {
+                        background-color: #ffffff;
+                        border-right: 1px solid #e4e4e7;
+                    }
+                """)
+            if hasattr(self, "floating_capsule"):
+                self.floating_capsule.setStyleSheet("""
+                    QFrame#FloatingCapsule {
+                        background-color: #ffffff;
+                        border: 1px solid #e4e4e7;
+                        border-radius: 18px;
+                    }
+                """)
+        else:
+            if hasattr(self, "top_toolbar"):
+                self.top_toolbar.setStyleSheet("""
+                    QFrame#TopToolbar {
+                        background-color: #202023;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                    }
+                """)
+            if hasattr(self, "bottom_dock"):
+                self.bottom_dock.setStyleSheet("""
+                    QFrame#BottomDock {
+                        background-color: #202023;
+                        border-top: 1px solid rgba(255, 255, 255, 0.08);
+                    }
+                """)
+            if hasattr(self, "left_drawer"):
+                self.left_drawer.setStyleSheet("""
+                    QFrame#LeftDrawer {
+                        background-color: #202023;
+                        border-right: 1px solid rgba(255, 255, 255, 0.08);
+                    }
+                """)
+            if hasattr(self, "floating_capsule"):
+                self.floating_capsule.setStyleSheet("""
+                    QFrame#FloatingCapsule {
+                        background-color: #27272a;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 18px;
+                    }
+                """)
+
+        # 3. 顶栏按钮样式与主题切换按钮
+        icon_color = "#52525b" if is_light else "#a1a1aa"
+        if hasattr(self, "btn_toggle_left"):
+            self.btn_toggle_left.setIcon(LucideIcon.icon("panel-left", 16, icon_color))
+            self.btn_toggle_left.setStyleSheet(self._icon_btn_css())
+        if hasattr(self, "btn_toggle_right"):
+            self.btn_toggle_right.setIcon(LucideIcon.icon("panel-right", 16, icon_color))
+            self.btn_toggle_right.setStyleSheet(self._icon_btn_css())
+        if hasattr(self, "btn_help"):
+            self.btn_help.setIcon(LucideIcon.icon("help", 16, icon_color))
+            self.btn_help.setStyleSheet(self._icon_btn_css() + "QToolButton::menu-indicator { image: none; }")
+
+        # 主题切换按钮：深色模式显示太阳（点击切换浅色），浅色模式显示月亮（点击切换深色）
+        if hasattr(self, "btn_theme_toggle"):
+            if is_light:
+                self.btn_theme_toggle.setIcon(LucideIcon.icon("moon", 16, "#52525b"))
+                self.btn_theme_toggle.setToolTip("切换为深色模式 (快捷键 F2)")
+            else:
+                self.btn_theme_toggle.setIcon(LucideIcon.icon("sun", 16, "#fbbf24"))
+                self.btn_theme_toggle.setToolTip("切换为浅色模式 (快捷键 F2)")
+            self.btn_theme_toggle.setStyleSheet(self._icon_btn_css())
+
+        if hasattr(self, "lbl_top_title"):
+            title_color = "#18181b" if is_light else "#f4f4f5"
+            self.lbl_top_title.setStyleSheet(f"color: {title_color}; font-size: 14px; font-weight: 600; border: none;")
+        if hasattr(self, "lbl_top_ver"):
+            ver_bg = "#e4e4e7" if is_light else "#27272a"
+            ver_fg = "#52525b" if is_light else "#71717a"
+            self.lbl_top_ver.setStyleSheet(
+                f"background-color: {ver_bg}; color: {ver_fg}; font-size: 11px; "
+                "padding: 1px 6px; border-radius: 4px; border: none;"
+            )
+
+        # 4. 子组件 set_theme
+        if hasattr(self, "seg_mode"):
+            self.seg_mode.set_theme(theme)
+        if hasattr(self, "path_input_1"):
+            self.path_input_1.set_theme(theme)
+        if hasattr(self, "path_input_2"):
+            self.path_input_2.set_theme(theme)
+        if hasattr(self, "sens_selector"):
+            self.sens_selector.set_theme(theme)
+        if hasattr(self, "sens_interactive_bar"):
+            self.sens_interactive_bar.set_theme(theme)
+        if hasattr(self, "drop_card_1"):
+            self.drop_card_1.set_theme(theme)
+        if hasattr(self, "drop_card_2"):
+            self.drop_card_2.set_theme(theme)
+        if hasattr(self, "cross_connector"):
+            self.cross_connector.set_theme(theme)
+        if hasattr(self, "toast_banner"):
+            self.toast_banner.set_theme(theme)
+        if hasattr(self, "right_inspector"):
+            self.right_inspector.set_theme(theme)
+
+        # 5. 更新包含子文件夹按钮
+        self._refresh_subfolder_toggle_ui()
+
+        # 6. 更新翻页按钮与底部 Dock 样式
+        if hasattr(self, "btn_prev_grp") and hasattr(self, "btn_next_grp"):
+            self.btn_prev_grp.setStyleSheet(self._secondary_pill_css())
+            self.btn_next_grp.setStyleSheet(self._secondary_pill_css())
+            self.btn_prev_grp.setIcon(LucideIcon.icon("chevron-left", 14, icon_color))
+            self.btn_next_grp.setIcon(LucideIcon.icon("chevron-right", 14, icon_color))
+
+        if hasattr(self, "lbl_dock_progress"):
+            self.lbl_dock_progress.setStyleSheet(
+                "color: #71717a; font-size: 12px; border: none;" if is_light else
+                "color: #a1a1aa; font-size: 12px; border: none;"
+            )
+        if hasattr(self, "lbl_dock_shortcuts"):
+            self.lbl_dock_shortcuts.setStyleSheet(
+                "color: #a1a1aa; font-size: 11px; border: none;" if is_light else
+                "color: #52525b; font-size: 11px; border: none;"
+            )
+        if hasattr(self, "scan_progress_bar"):
+            bar_bg = "#e4e4e7" if is_light else "#27272a"
+            self.scan_progress_bar.setStyleSheet(f"""
+                QProgressBar {{
+                    background-color: {bar_bg};
+                    border: none;
+                    border-radius: 3px;
+                }}
+                QProgressBar::chunk {{
+                    background-color: #2563eb;
+                    border-radius: 3px;
+                }}
+            """)
+
+        # 7. 刷新胶囊按钮样式与分隔线
+        if hasattr(self, "capsule_sep"):
+            sep_bg = "#e4e4e7" if is_light else "rgba(255, 255, 255, 0.10)"
+            self.capsule_sep.setStyleSheet(f"background-color: {sep_bg}; border: none;")
+        if hasattr(self, "floating_capsule"):
+            self._refresh_capsule_styles()
+
+        # 8. 刷新左侧列表项
+        if hasattr(self, "list_groups"):
+            for i in range(self.list_groups.count()):
+                it = self.list_groups.item(i)
+                if it:
+                    w = self.list_groups.itemWidget(it)
+                    if isinstance(w, GroupDrawerItemWidget):
+                        w.set_theme(theme)
+
+        # 9. 重新渲染当前正在查看的组
+        if hasattr(self, "phase_stack") and self.phase_stack.currentIndex() == self.PHASE_REVIEW and self.current_group:
+            self._render_current_group()
 
     def _init_ui(self):
         central = QWidget()
@@ -3312,16 +4044,16 @@ class DedupMainWindow(QMainWindow):
         tb_layout.addWidget(self.btn_toggle_left)
 
         # 应用标题与版本号
-        lbl_title = QLabel("图像智能查重工作台")
-        lbl_title.setStyleSheet("color: #f4f4f5; font-size: 14px; font-weight: 600; border: none;")
-        tb_layout.addWidget(lbl_title)
+        self.lbl_top_title = QLabel("图像智能查重工作台")
+        self.lbl_top_title.setStyleSheet("color: #f4f4f5; font-size: 14px; font-weight: 600; border: none;")
+        tb_layout.addWidget(self.lbl_top_title)
 
-        lbl_ver = QLabel(f"v{APP_VERSION}")
-        lbl_ver.setStyleSheet(
+        self.lbl_top_ver = QLabel(f"v{APP_VERSION}")
+        self.lbl_top_ver.setStyleSheet(
             "background-color: #27272a; color: #71717a; font-size: 11px; "
             "padding: 1px 6px; border-radius: 4px; border: none;"
         )
-        tb_layout.addWidget(lbl_ver)
+        tb_layout.addWidget(self.lbl_top_ver)
 
         tb_layout.addSpacing(4)
 
@@ -3393,6 +4125,14 @@ class DedupMainWindow(QMainWindow):
         self.btn_subfolders_tb.setCursor(Qt.PointingHandCursor)
         self.btn_subfolders_tb.clicked.connect(self._on_subfolders_toggled)
         tb_layout.addWidget(self.btn_subfolders_tb)
+
+        # 主题切换按钮（深色 / 浅色模式，快捷键 F2）
+        self.btn_theme_toggle = QPushButton()
+        self.btn_theme_toggle.setFixedSize(32, 32)
+        self.btn_theme_toggle.setCursor(Qt.PointingHandCursor)
+        self.btn_theme_toggle.setStyleSheet(self._icon_btn_css())
+        self.btn_theme_toggle.clicked.connect(self._toggle_theme)
+        tb_layout.addWidget(self.btn_theme_toggle)
 
         # 帮助与更多菜单按钮（收纳所有辅助技巧与次要操作）
         self.btn_help = QToolButton()
@@ -3531,6 +4271,19 @@ class DedupMainWindow(QMainWindow):
         dlg.exec()
 
     def _icon_btn_css(self) -> str:
+        is_light = getattr(self, "_current_theme", "dark") == "light"
+        if is_light:
+            return """
+                QPushButton, QToolButton {
+                    background-color: transparent;
+                    border: 1px solid transparent;
+                    border-radius: 6px;
+                }
+                QPushButton:hover, QToolButton:hover {
+                    background-color: #f4f4f5;
+                    border-color: #e4e4e7;
+                }
+            """
         return """
             QPushButton, QToolButton {
                 background-color: transparent;
@@ -3544,6 +4297,22 @@ class DedupMainWindow(QMainWindow):
         """
 
     def _secondary_pill_css(self) -> str:
+        is_light = getattr(self, "_current_theme", "dark") == "light"
+        if is_light:
+            return """
+                QPushButton {
+                    background-color: #f4f4f5;
+                    color: #27272a;
+                    font-size: 12px;
+                    padding: 0 12px;
+                    border: 1px solid #e4e4e7;
+                    border-radius: 6px;
+                }
+                QPushButton:hover {
+                    background-color: #e4e4e7;
+                    color: #09090b;
+                }
+            """
         return """
             QPushButton {
                 background-color: #27272a;
@@ -3561,6 +4330,10 @@ class DedupMainWindow(QMainWindow):
 
     def _build_help_menu(self):
         menu = QMenu(self)
+
+        act_theme = QAction("切换深色 / 浅色模式... [F2]", self)
+        act_theme.triggered.connect(self._toggle_theme)
+        menu.addAction(act_theme)
 
         act_guide = QAction("使用指南与常见问题 (白名单 / 找回已删图)... [F1]", self)
         act_guide.triggered.connect(self._show_about_dialog)
@@ -3634,6 +4407,7 @@ class DedupMainWindow(QMainWindow):
 
     def _refresh_subfolder_toggle_ui(self):
         checked = self._include_subfolders
+        is_light = getattr(self, "_current_theme", "dark") == "light"
         for btn in (getattr(self, "btn_subfolders_tb", None), getattr(self, "btn_subfolders_cta", None)):
             if btn is None:
                 continue
@@ -3643,82 +4417,151 @@ class DedupMainWindow(QMainWindow):
 
         if hasattr(self, "btn_subfolders_tb"):
             if checked:
-                self.btn_subfolders_tb.setIcon(LucideIcon.icon("check", 14, "#60a5fa"))
+                self.btn_subfolders_tb.setIcon(LucideIcon.icon("check", 14, "#2563eb" if is_light else "#60a5fa"))
                 self.btn_subfolders_tb.setText(" 包含子文件夹: 开")
                 self.btn_subfolders_tb.setToolTip("当前：递归扫描全部嵌套子文件夹。点击可切换为仅扫描顶层文件夹")
-                self.btn_subfolders_tb.setStyleSheet("""
-                    QPushButton {
-                        background-color: rgba(37, 99, 235, 0.18);
-                        color: #60a5fa;
-                        font-size: 12px;
-                        font-weight: 600;
-                        padding: 0 10px;
-                        border: 1px solid rgba(59, 130, 246, 0.55);
-                        border-radius: 6px;
-                    }
-                    QPushButton:hover {
-                        background-color: rgba(37, 99, 235, 0.28);
-                    }
-                """)
+                if is_light:
+                    self.btn_subfolders_tb.setStyleSheet("""
+                        QPushButton {
+                            background-color: #eff6ff;
+                            color: #2563eb;
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 0 10px;
+                            border: 1px solid #3b82f6;
+                            border-radius: 6px;
+                        }
+                        QPushButton:hover {
+                            background-color: #dbeafe;
+                        }
+                    """)
+                else:
+                    self.btn_subfolders_tb.setStyleSheet("""
+                        QPushButton {
+                            background-color: rgba(37, 99, 235, 0.18);
+                            color: #60a5fa;
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 0 10px;
+                            border: 1px solid rgba(59, 130, 246, 0.55);
+                            border-radius: 6px;
+                        }
+                        QPushButton:hover {
+                            background-color: rgba(37, 99, 235, 0.28);
+                        }
+                    """)
             else:
-                self.btn_subfolders_tb.setIcon(LucideIcon.icon("folder-plus", 14, "#a1a1aa"))
+                icon_color = "#52525b" if is_light else "#a1a1aa"
+                self.btn_subfolders_tb.setIcon(LucideIcon.icon("folder-plus", 14, icon_color))
                 self.btn_subfolders_tb.setText(" 包含子文件夹")
                 self.btn_subfolders_tb.setToolTip("当前：默认仅扫描当前顶层文件夹（不含子文件夹）。点击可开启子文件夹扫描")
-                self.btn_subfolders_tb.setStyleSheet("""
-                    QPushButton {
-                        background-color: #18181b;
-                        color: #a1a1aa;
-                        font-size: 12px;
-                        padding: 0 10px;
-                        border: 1px solid rgba(255, 255, 255, 0.08);
-                        border-radius: 6px;
-                    }
-                    QPushButton:hover {
-                        background-color: #27272a;
-                        color: #e4e4e7;
-                        border-color: rgba(255, 255, 255, 0.16);
-                    }
-                """)
+                if is_light:
+                    self.btn_subfolders_tb.setStyleSheet("""
+                        QPushButton {
+                            background-color: #ffffff;
+                            color: #52525b;
+                            font-size: 12px;
+                            padding: 0 10px;
+                            border: 1px solid #e4e4e7;
+                            border-radius: 6px;
+                        }
+                        QPushButton:hover {
+                            background-color: #f4f4f5;
+                            color: #18181b;
+                            border-color: #cbd5e1;
+                        }
+                    """)
+                else:
+                    self.btn_subfolders_tb.setStyleSheet("""
+                        QPushButton {
+                            background-color: #18181b;
+                            color: #a1a1aa;
+                            font-size: 12px;
+                            padding: 0 10px;
+                            border: 1px solid rgba(255, 255, 255, 0.08);
+                            border-radius: 6px;
+                        }
+                        QPushButton:hover {
+                            background-color: #27272a;
+                            color: #e4e4e7;
+                            border-color: rgba(255, 255, 255, 0.16);
+                        }
+                    """)
 
         if hasattr(self, "btn_subfolders_cta"):
             if checked:
-                self.btn_subfolders_cta.setIcon(LucideIcon.icon("check", 15, "#60a5fa"))
+                self.btn_subfolders_cta.setIcon(LucideIcon.icon("check", 15, "#2563eb" if is_light else "#60a5fa"))
                 self.btn_subfolders_cta.setText(" 包含子文件夹：已开启")
                 self.btn_subfolders_cta.setToolTip("当前已开启：将递归扫描所选文件夹及其全部子文件夹。点击可关闭")
-                self.btn_subfolders_cta.setStyleSheet("""
-                    QPushButton {
-                        background-color: rgba(37, 99, 235, 0.16);
-                        color: #60a5fa;
-                        font-size: 13px;
-                        font-weight: 600;
-                        padding: 0 16px;
-                        border-radius: 8px;
-                        border: 1px solid rgba(59, 130, 246, 0.55);
-                    }
-                    QPushButton:hover {
-                        background-color: rgba(37, 99, 235, 0.25);
-                    }
-                """)
+                if is_light:
+                    self.btn_subfolders_cta.setStyleSheet("""
+                        QPushButton {
+                            background-color: #eff6ff;
+                            color: #2563eb;
+                            font-size: 13px;
+                            font-weight: 600;
+                            padding: 0 16px;
+                            border-radius: 8px;
+                            border: 1px solid #3b82f6;
+                        }
+                        QPushButton:hover {
+                            background-color: #dbeafe;
+                        }
+                    """)
+                else:
+                    self.btn_subfolders_cta.setStyleSheet("""
+                        QPushButton {
+                            background-color: rgba(37, 99, 235, 0.16);
+                            color: #60a5fa;
+                            font-size: 13px;
+                            font-weight: 600;
+                            padding: 0 16px;
+                            border-radius: 8px;
+                            border: 1px solid rgba(59, 130, 246, 0.55);
+                        }
+                        QPushButton:hover {
+                            background-color: rgba(37, 99, 235, 0.25);
+                        }
+                    """)
             else:
-                self.btn_subfolders_cta.setIcon(LucideIcon.icon("folder-plus", 15, "#a1a1aa"))
+                icon_color = "#52525b" if is_light else "#a1a1aa"
+                self.btn_subfolders_cta.setIcon(LucideIcon.icon("folder-plus", 15, icon_color))
                 self.btn_subfolders_cta.setText(" 包含子文件夹（可选）")
                 self.btn_subfolders_cta.setToolTip("默认不扫描子文件夹。点击勾选后，可一并递归扫描所有子文件夹")
-                self.btn_subfolders_cta.setStyleSheet("""
-                    QPushButton {
-                        background-color: #202023;
-                        color: #a1a1aa;
-                        font-size: 13px;
-                        font-weight: 500;
-                        padding: 0 16px;
-                        border-radius: 8px;
-                        border: 1px solid rgba(255, 255, 255, 0.10);
-                    }
-                    QPushButton:hover {
-                        background-color: #27272a;
-                        color: #f4f4f5;
-                        border-color: rgba(255, 255, 255, 0.20);
-                    }
-                """)
+                if is_light:
+                    self.btn_subfolders_cta.setStyleSheet("""
+                        QPushButton {
+                            background-color: #ffffff;
+                            color: #52525b;
+                            font-size: 13px;
+                            font-weight: 500;
+                            padding: 0 16px;
+                            border-radius: 8px;
+                            border: 1px solid #e4e4e7;
+                        }
+                        QPushButton:hover {
+                            background-color: #f4f4f5;
+                            color: #18181b;
+                            border-color: #cbd5e1;
+                        }
+                    """)
+                else:
+                    self.btn_subfolders_cta.setStyleSheet("""
+                        QPushButton {
+                            background-color: #202023;
+                            color: #a1a1aa;
+                            font-size: 13px;
+                            font-weight: 500;
+                            padding: 0 16px;
+                            border-radius: 8px;
+                            border: 1px solid rgba(255, 255, 255, 0.10);
+                        }
+                        QPushButton:hover {
+                            background-color: #27272a;
+                            color: #f4f4f5;
+                            border-color: rgba(255, 255, 255, 0.20);
+                        }
+                    """)
 
     # ==================== 阶段 1：准备与导入态构建 ====================
 
@@ -3984,10 +4827,10 @@ class DedupMainWindow(QMainWindow):
         cap_layout.addWidget(self.btn_cap_single_col)
 
         # 分隔竖线
-        sep = QFrame()
-        sep.setFixedSize(1, 16)
-        sep.setStyleSheet("background-color: rgba(255, 255, 255, 0.10); border: none;")
-        cap_layout.addWidget(sep)
+        self.capsule_sep = QFrame()
+        self.capsule_sep.setFixedSize(1, 16)
+        self.capsule_sep.setStyleSheet("background-color: rgba(255, 255, 255, 0.10); border: none;")
+        cap_layout.addWidget(self.capsule_sep)
 
         # [白名单保留 (Space)]
         self.btn_cap_whitelist = QPushButton(" 白名单 (Space)")
@@ -4038,24 +4881,45 @@ class DedupMainWindow(QMainWindow):
         self.phase_stack.addWidget(workbench)
 
     def _refresh_capsule_styles(self):
-        idle_pill = """
-            QPushButton {
-                background-color: transparent;
-                color: #a1a1aa;
-                font-size: 12px;
-                font-weight: 500;
-                padding: 0 10px;
-                border-radius: 14px;
-                border: none;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.06);
-                color: #f4f4f5;
-            }
-            QPushButton:disabled {
-                color: #52525b;
-            }
-        """
+        is_light = getattr(self, "_current_theme", "dark") == "light"
+        if is_light:
+            idle_pill = """
+                QPushButton {
+                    background-color: transparent;
+                    color: #52525b;
+                    font-size: 12px;
+                    font-weight: 500;
+                    padding: 0 10px;
+                    border-radius: 14px;
+                    border: none;
+                }
+                QPushButton:hover {
+                    background-color: #f4f4f5;
+                    color: #18181b;
+                }
+                QPushButton:disabled {
+                    color: #a1a1aa;
+                }
+            """
+        else:
+            idle_pill = """
+                QPushButton {
+                    background-color: transparent;
+                    color: #a1a1aa;
+                    font-size: 12px;
+                    font-weight: 500;
+                    padding: 0 10px;
+                    border-radius: 14px;
+                    border: none;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255, 255, 255, 0.06);
+                    color: #f4f4f5;
+                }
+                QPushButton:disabled {
+                    color: #52525b;
+                }
+            """
         active_pill = """
             QPushButton {
                 background-color: #2563eb;
@@ -4067,24 +4931,28 @@ class DedupMainWindow(QMainWindow):
                 border: none;
             }
         """
+        idle_icon = "#52525b" if is_light else "#a1a1aa"
         self.btn_cap_reset.setStyleSheet(idle_pill)
+        self.btn_cap_reset.setIcon(LucideIcon.icon("maximize", 14, idle_icon))
         self.btn_cap_whitelist.setStyleSheet(idle_pill)
+        self.btn_cap_whitelist.setIcon(LucideIcon.icon("check", 14, idle_icon))
         self.btn_cap_undo.setStyleSheet(idle_pill)
+        self.btn_cap_undo.setIcon(LucideIcon.icon("undo", 14, idle_icon))
 
         self.btn_cap_sync.setStyleSheet(active_pill if self.btn_cap_sync.isChecked() else idle_pill)
-        self.btn_cap_sync.setIcon(LucideIcon.icon("link", 14, "#ffffff" if self.btn_cap_sync.isChecked() else "#a1a1aa"))
+        self.btn_cap_sync.setIcon(LucideIcon.icon("link", 14, "#ffffff" if self.btn_cap_sync.isChecked() else idle_icon))
 
         self.btn_cap_heatmap.setStyleSheet(active_pill if self.btn_cap_heatmap.isChecked() else idle_pill)
-        self.btn_cap_heatmap.setIcon(LucideIcon.icon("layers", 14, "#ffffff" if self.btn_cap_heatmap.isChecked() else "#a1a1aa"))
+        self.btn_cap_heatmap.setIcon(LucideIcon.icon("layers", 14, "#ffffff" if self.btn_cap_heatmap.isChecked() else idle_icon))
 
         self.btn_cap_curtain.setStyleSheet(active_pill if self.btn_cap_curtain.isChecked() else idle_pill)
-        self.btn_cap_curtain.setIcon(LucideIcon.icon("columns", 14, "#ffffff" if self.btn_cap_curtain.isChecked() else "#a1a1aa"))
+        self.btn_cap_curtain.setIcon(LucideIcon.icon("columns", 14, "#ffffff" if self.btn_cap_curtain.isChecked() else idle_icon))
 
         self.btn_cap_grid.setStyleSheet(active_pill if self.btn_cap_grid.isChecked() else idle_pill)
-        self.btn_cap_grid.setIcon(LucideIcon.icon("grid", 14, "#ffffff" if self.btn_cap_grid.isChecked() else "#a1a1aa"))
+        self.btn_cap_grid.setIcon(LucideIcon.icon("grid", 14, "#ffffff" if self.btn_cap_grid.isChecked() else idle_icon))
 
         self.btn_cap_single_col.setStyleSheet(active_pill if self.btn_cap_single_col.isChecked() else idle_pill)
-        self.btn_cap_single_col.setIcon(LucideIcon.icon("layout-list", 14, "#ffffff" if self.btn_cap_single_col.isChecked() else "#a1a1aa"))
+        self.btn_cap_single_col.setIcon(LucideIcon.icon("layout-list", 14, "#ffffff" if self.btn_cap_single_col.isChecked() else idle_icon))
 
     # ==================== 阶段切换与交互逻辑 ====================
 
@@ -4334,6 +5202,7 @@ class DedupMainWindow(QMainWindow):
             item = QListWidgetItem(self.list_groups)
             item.setSizeHint(QSize(228, 54))
             card_widget = GroupDrawerItemWidget(g)
+            card_widget.set_theme(self._current_theme)
             self.list_groups.addItem(item)
             self.list_groups.setItemWidget(item, card_widget)
             if prev_group_id is not None and g.group_id == prev_group_id:
@@ -4541,7 +5410,7 @@ class DedupMainWindow(QMainWindow):
         if self.btn_cap_curtain.isChecked() and len(active) >= 2:
             pix_a = load_qpixmap_safe(ref_item.filepath)
             pix_b = load_qpixmap_safe(cand_item.filepath)
-            curtain = CurtainCompareWidget(pix_a, pix_b, ref_item.filename, cand_item.filename)
+            curtain = CurtainCompareWidget(pix_a, pix_b, ref_item.filename, cand_item.filename, theme=self._current_theme)
             self.viewport_layout.addWidget(curtain, 0, 0, 1, 2)
             self.lbl_dock_shortcuts.setText("左右拖拽滑块对比  |  Delete 废弃对比图  |  Space 白名单  |  Ctrl+Z 撤销")
             self.right_inspector.update_group(grp, item_a=ref_item, item_b=cand_item)
@@ -4560,7 +5429,8 @@ class DedupMainWindow(QMainWindow):
                     parent=self.viewport_container,
                     display_key_num=idx + 1,
                     single_column=is_single_col,
-                    is_grid_mode=True
+                    is_grid_mode=True,
+                    theme=self._current_theme
                 )
                 unit.keepRequested.connect(self._on_keep_only_item)
                 unit.deleteRequested.connect(self._on_delete_single_item)
@@ -4597,7 +5467,8 @@ class DedupMainWindow(QMainWindow):
             is_recommended=False,
             parent=self.viewport_container,
             display_key_num=1,
-            is_grid_mode=False
+            is_grid_mode=False,
+            theme=self._current_theme
         )
         unit_a.keepRequested.connect(self._on_keep_only_item)
         unit_a.deleteRequested.connect(self._on_delete_single_item)
@@ -4618,7 +5489,8 @@ class DedupMainWindow(QMainWindow):
                 candidates=candidates if len(candidates) > 1 else None,
                 current_candidate_idx=cand_idx,
                 display_key_num=2,
-                is_grid_mode=False
+                is_grid_mode=False,
+                theme=self._current_theme
             )
             unit_b.keepRequested.connect(self._on_keep_only_item)
             unit_b.deleteRequested.connect(self._on_delete_single_item)
@@ -4641,23 +5513,27 @@ class DedupMainWindow(QMainWindow):
         if self.btn_cap_heatmap.isChecked() and len(active) >= 2:
             diff_bgr = compute_diff_visualization(ref_item.filepath, cand_item.filepath)
             if diff_bgr is not None:
+                is_light = self._current_theme == "light"
+                heat_bg = "#ffffff" if is_light else "#202023"
+                heat_border = "rgba(217, 119, 6, 0.45)" if is_light else "rgba(245, 158, 11, 0.35)"
                 heat_frame = QFrame()
-                heat_frame.setStyleSheet("""
-                    QFrame {
-                        background-color: #202023;
-                        border: 1px solid rgba(245, 158, 11, 0.35);
+                heat_frame.setStyleSheet(f"""
+                    QFrame {{
+                        background-color: {heat_bg};
+                        border: 1px solid {heat_border};
                         border-radius: 8px;
-                    }
+                    }}
                 """)
                 h_lay = QVBoxLayout(heat_frame)
                 h_lay.setContentsMargins(12, 10, 12, 12)
                 h_lay.setSpacing(8)
 
                 lbl_h = QLabel("像素差异热图（高亮区为差异部位）")
-                lbl_h.setStyleSheet("color: #f59e0b; font-size: 12px; font-weight: 600; border: none;")
+                lbl_color = "#d97706" if is_light else "#f59e0b"
+                lbl_h.setStyleSheet(f"color: {lbl_color}; font-size: 12px; font-weight: 600; border: none;")
                 h_lay.addWidget(lbl_h)
 
-                heat_canvas = SyncZoomImageView(heat_frame)
+                heat_canvas = SyncZoomImageView(heat_frame, theme=self._current_theme)
                 heat_canvas.set_pixmap(cv2_to_qpixmap(diff_bgr))
                 h_lay.addWidget(heat_canvas, stretch=1)
 
@@ -4677,7 +5553,7 @@ class DedupMainWindow(QMainWindow):
     # ==================== 纯键盘流水线作业与安全可逆操作 ====================
 
     def _bind_shortcuts(self):
-        # 1~9 保留对应单图 | Space 白名单 | Delete 废弃对比图 | Ctrl+Z 撤销 | 左右方向键翻组 | F1 帮助指南
+        # 1~9 保留对应单图 | Space 白名单 | Delete 废弃对比图 | Ctrl+Z 撤销 | 左右方向键翻组 | F1 帮助指南 | F2 切换主题
         for digit in range(1, 10):
             QShortcut(QKeySequence(str(digit)), self).activated.connect(lambda d=digit - 1: self._keep_by_index(d))
         QShortcut(QKeySequence(Qt.Key_Space), self).activated.connect(self._whitelist_current_group)
@@ -4686,6 +5562,7 @@ class DedupMainWindow(QMainWindow):
         QShortcut(QKeySequence(Qt.Key_Left), self).activated.connect(self._go_prev_group)
         QShortcut(QKeySequence(Qt.Key_Right), self).activated.connect(self._go_next_group)
         QShortcut(QKeySequence(Qt.Key_F1), self).activated.connect(self._show_about_dialog)
+        QShortcut(QKeySequence(Qt.Key_F2), self).activated.connect(self._toggle_theme)
 
     def _keep_by_index(self, key_num: int):
         if self.phase_stack.currentIndex() != self.PHASE_REVIEW or not self.current_group:

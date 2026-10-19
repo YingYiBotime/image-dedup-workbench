@@ -1,18 +1,23 @@
-# Image Dedup Workbench (图像智能查重与对比工作台 v4.1.1)
+# Image Dedup Workbench (图像智能查重与对比工作台 v4.1.2)
 
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%20Qt-41CD52?style=flat-square&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
 [![OpenCV](https://img.shields.io/badge/Engine-OpenCV%20%2B%20SIFT-5C3EE8?style=flat-square&logo=opencv&logoColor=white)](https://opencv.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-一款专注于**商业级高精度图像去重、跨分辨率缩放识别与像素级差异比对**的现代化桌面生产力工作台（Studio Dark 现代中性暗色规范）。提供单文件直接运行的**免安装绿色便携版**，支持**单文件夹内部查重**与**跨文件夹交叉比对**。
+一款专注于**商业级高精度图像去重、跨分辨率缩放识别与像素级差异比对**的现代化桌面生产力工作台（Studio Dark 现代中性暗色规范与 Clean Studio Light 现代浅色规范）。提供单文件直接运行的**免安装绿色便携版**，支持**单文件夹内部查重**与**跨文件夹交叉比对**。
 
 ---
 
 ## 核心特性 (Features)
 
+- **深色模式与浅色模式一键切换 (Dark & Light Theme Switching)**：
+  - **工业级双色调配色体系**：预设 Studio Dark（中性深灰，低眩光）与 Clean Studio Light（清爽明亮浅灰）两套严谨工业级色彩系统；
+  - **顶栏矢量按钮与全局 F2 快捷键**：顶栏常驻主题切换按钮（内置太阳与月亮纯矢量图标），同时支持全局快捷键 `F2` 及帮助菜单唤出，即时秒切无延迟；
+  - **全界面深度自适应响应**：顶栏工具栏、左侧分组导航抽屉、双视口图像卡片、操作胶囊条、属性检视面板、滑动卷帘对比器、差异热图、模式切换控制器及状态通知全局动态同步色彩；
+  - **SQLite 本地状态记忆持久化**：用户主题偏好自动保存至系统状态库，下次启动工作台自动载入上次使用的主题模式。
 - **严格绝对槽位与防误删架构 (Strict Fixed Slot Viewport)**：
-  - **彻底取消主观推荐偏见**：移除基于像素与体积的自动推荐算法与诱导性绿色标识，左右卡片统一采用中性暗色风格；
+  - **彻底取消主观推荐偏见**：移除基于像素与体积的自动推荐算法与诱导性绿色标识，左右卡片统一采用中性暗色/浅色卡片风格；
   - **绝对锁定左图原始图与右图对比图**：跨文件夹或单文件夹查重对比时，左视口永远锁定为基准原始图 A（文件夹 1），右视口永远锁定为对比图 B/C...（文件夹 2），绝不发生位置对调；
   - **键位与槽位绝对对应**：快捷键 `1` / [保留 (1)] 严格保留左侧原始图 A，快捷键 `2` / [保留 (2)] 严格保留右侧对比图 B，快捷键 `Delete` 快速保留左图原始图并废弃右侧对比副本，彻底杜绝误删。
 - **超大图库与高分辨率零延迟架构 (Zero-Lag High-Res Architecture)**：
@@ -42,7 +47,7 @@
   - **安全回收暂存区 (staging_trash)**：被淘汰的重复图片安全移入 `%LOCALAPPDATA%\TableclothDedupPro\staging_trash`，随时支持一键打开彻底清理；
   - **100% 原路径无损撤销**：删错时随时按 `Ctrl + Z`（支持连续撤销），原文件名与原文件夹路径毫秒级无损还原。
 - **纯键盘流水线决断与交互辅助 (Keyboard Pipeline & Tooling)**：
-  - **纯键盘流水线决断**：`1` 保留左侧原始图 A、`2` 保留右侧对比图 B、`Delete` 快速保留左图废弃右图副本、`Space` 加入白名单、`Ctrl+Z` 撤销、`F1` 打开帮助中心；
+  - **纯键盘流水线决断**：`1` 保留左侧原始图 A、`2` 保留右侧对比图 B、`Delete` 快速保留左图废弃右图副本、`Space` 加入白名单、`Ctrl+Z` 撤销、`F1` 打开帮助中心、`F2` 快速切换深色/浅色模式；
   - **差异热图 (Diff Heatmap) 与滑动卷帘对比 (Curtain Wipe)**：一秒看穿微调、水印、瑕疵与像素差异。
 
 ---
@@ -78,7 +83,7 @@ python app.py
 
 ## 免安装绿色版使用说明 (Portable Build)
 
-1. 双击运行 `dist_portable\图像智能查重工作台\图像智能查重工作台.exe`（或解压 `图像智能查重工作台_免安装绿色版_v4.1.1.zip`）；
+1. 双击运行 `dist_portable\图像智能查重工作台\图像智能查重工作台.exe`（或解压 `图像智能查重工作台_免安装绿色版_v4.1.2.zip`）；
 2. 目标电脑无需安装 Python 或任何依赖环境，双击即可直接使用。
 
 ---

@@ -1,15 +1,15 @@
 {
-  "version": "4.1.1",
-  "published_at": "2026-10-15 12:50:35",
+  "version": "4.1.2",
+  "published_at": "2026-10-19 17:02:19",
   "hotpatch_files": {
-    "app.py": "18b0ced0dab367e7c1128f6762dd85a0bf1997c7afb5445fa88342100a372f92",
+    "app.py": "1eb06a140fd849e8c93ef3386d8cd44f23960230b9cd7420540823de06e2e3b1",
     "engine.py": "9d53f9681d146e2da83104497fbf8268738881d5861dbf992e12aac40f9dc77e",
-    "core_infra.py": "ade9a090b3809dfc971b3ed983ed7df35a5fd4f1da613994850fbeba14161dc6",
+    "core_infra.py": "60b0088cdb76c00238f67cb2b1953e76accdf34439e630d67fd0adb76d9e3e48",
     "generate_icon.py": "78f74c68853a8f57856f45c1e4f759c33d60e060336a80655c09f105c104bb35",
     "github_ota_config.json": "1dd58c6aae5ebb6933471858809869312d77d4d064f7f428820f5ea1410b2dab"
   },
-  "hotpatch_size_kb": 336.9,
-  "hotpatch_sha256": "edd7af3782813f0b6f7ba6ebd5a0582fc69ff0a33bd3016dab8517e472cf1590",
-  "hotpatch_rsa_sig": "PV8KC3sCjja8dk4Qj5sqlnit32VarUyppKCvyWRd1ER_vKSxWR9YnIBJcN8zuFnGzsDhMVolSx9qunVmdi7aDWm9ZS-Hj7jOC6bgB9ZZr2GPY0jWNgospR2w39dio1kRr7yoNSHVOO-csC5Evoo7TXNl3kuxTVGUdsLONKeas8QWW06bpXHTROdQYkAQvV6hCiy0mF18aQv9Y82Lzel7i2NrAULw9XtzTnJghbHVN8eNgAmt_YOOLux_65eP59NTjwlKmMxE4raloRaoax-yD4gisk-gsS8Fh58pmlpk9SNBuJroz0ZJG-uDJwI0AEW0UnZcT7CVy7MJf1MwqiFsQg",
-  "notes": "取消智能推荐保留功能，固定左侧为原始图A右侧为对比图B彻底杜绝误删"
+  "hotpatch_size_kb": 374.8,
+  "hotpatch_sha256": "a16ef14a3380d065caf4334170d3bfce584209e6005369f46d10668e0bfc89b4",
+  "hotpatch_rsa_sig": "qL-vo7h3PC3RzbUuKCrOlxS4IpeQ2kYeFk7PN2S6CO2QVnndZkkxGgY_yEphq7cdLFYJfxJT4xfvyEj-xOHiuWiZcbEef7bFvVsSIqpL3jYI_gD40ZbxhDdCWim9w7A33iiCyfhPLdI4vhnbpGHLcrscf5g9NNroDncnaY7ciTM2IedfoABU8K30ZADegHeSMOPAruta_ID98HEd6cQB0sV-XWt1sKxiWcKTG0JEc6IllBDxvPrhHekyILNrEN3Ki-Yg21LPvwivj0KUstBSmTHCIB4Keow3-836HZ7OVYJjOqbkSAnH_5fk14xFJvycQC51Xuck3K8N6dgyoGqVAQ",
+  "notes": "新增深色模式与浅色模式一键切换功能，支持顶栏按钮与F2快捷键"
 }
