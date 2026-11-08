@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-印花查重工作台 v4.0 — 商业级基础架构核心套件 (core_infra.py)
+EVE_IDT v4.1.3 — 商业级基础架构核心套件 (core_infra.py)
+文件说明: Eve_image_dedup_tool
 包含：
 1. AppPaths & SQLiteStateStore：严格遵循 Windows 标准规范路径 (%APPDATA% / %LOCALAPPDATA%) 与 SQLite WAL 持久化迁移
 2. setup_rotating_logger & GlobalCrashHandler：10MB×7 工业级日志轮转 + 全局未捕获异常接管 (主线程/工作线程/Qt) + 崩溃报告弹窗
@@ -24,6 +25,7 @@ import traceback
 import threading
 import subprocess
 import zipfile
+import shutil
 import urllib.request
 from ctypes import wintypes
 from logging.handlers import RotatingFileHandler
@@ -39,9 +41,10 @@ from PySide6.QtWidgets import (
 )
 
 APP_VENDOR = "TableclothStudio"
-APP_INTERNAL_NAME = "TableclothDedupPro"
-APP_DISPLAY_NAME = "图像智能查重工作台"
-APP_VERSION = os.environ.get("TDPRO_ACTIVE_VERSION", "4.1.2")
+APP_INTERNAL_NAME = "EVE_IDT"
+APP_DISPLAY_NAME = "EVE_IDT"
+APP_FILE_DESCRIPTION = "Eve_image_dedup_tool"
+APP_VERSION = os.environ.get("TDPRO_ACTIVE_VERSION", "4.1.3")
 
 # 默认内置的专属 GitHub 仓库地址与分支
 DEFAULT_GITHUB_REPO = "YingYiBotime/image-dedup-workbench"
@@ -103,6 +106,23 @@ class AppPaths:
             self.hotpatch_dir,
         ):
             os.makedirs(folder, exist_ok=True)
+
+        # 平滑迁移旧版 TableclothDedupPro 配置与状态数据库
+        try:
+            roaming_base = os.path.dirname(self.roaming_root)
+            legacy_roaming = os.path.join(roaming_base, "TableclothDedupPro")
+            if os.path.isdir(legacy_roaming):
+                for sub in ("config", "data"):
+                    src = os.path.join(legacy_roaming, sub)
+                    dst = getattr(self, f"{sub}_dir", None)
+                    if dst and os.path.isdir(src):
+                        for f in os.listdir(src):
+                            src_file = os.path.join(src, f)
+                            dst_file = os.path.join(dst, f)
+                            if os.path.isfile(src_file) and not os.path.exists(dst_file):
+                                shutil.copy2(src_file, dst_file)
+        except Exception:
+            pass
 
     def get_github_ota_config(self) -> Dict[str, str]:
         """读取 GitHub OTA 更新源配置（优先用户配置，其次程序内置 github_ota_config.json）"""
@@ -380,7 +400,7 @@ class CrashReportDialog(QDialog):
 
         btn_row.addStretch(1)
 
-        btn_continue = QPushButton("继续运行工作台")
+        btn_continue = QPushButton("继续运行 EVE_IDT")
         btn_continue.setStyleSheet("""
             QPushButton {
                 background-color: #2563eb;

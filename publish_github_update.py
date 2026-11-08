@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-图像智能查重工作台 v4.0 — GitHub 云端热更新一键打包签名与发布工具 (publish_github_update.py)
+EVE_IDT v4.1.3 — GitHub 云端热更新一键打包签名与发布工具 (publish_github_update.py)
+文件说明: Eve_image_dedup_tool
 核心能力：
 1. 将最新核心代码 (app.py, engine.py, core_infra.py, generate_icon.py) 压缩为 ~60KB 的 ota_hotpatch.zip；
 2. 计算 SHA-256 哈希并使用开发者 RSA-2048 私钥 (license_issuer.py) 进行数字签名，防止任何中间人篡改；
@@ -73,9 +74,12 @@ def save_config_everywhere(repo: str, branch: str = DEFAULT_GITHUB_BRANCH):
     paths = AppPaths()
     paths.save_github_ota_config(clean_repo, branch)
 
-    portable_dir = os.path.join(PROJECT_DIR, "dist_portable", "图像智能查重工作台")
+    portable_dir = os.path.join(PROJECT_DIR, "dist_portable", "EVE_IDT")
     if os.path.isdir(portable_dir):
         shutil.copy2(CONFIG_FILE, os.path.join(portable_dir, "github_ota_config.json"))
+    legacy_portable_dir = os.path.join(PROJECT_DIR, "dist_portable", "图像智能查重工作台")
+    if os.path.isdir(legacy_portable_dir):
+        shutil.copy2(CONFIG_FILE, os.path.join(legacy_portable_dir, "github_ota_config.json"))
 
 
 def sync_source_version(new_version: str):
@@ -190,7 +194,7 @@ def main():
     branch = args.branch.strip() or cfg.get("branch", DEFAULT_GITHUB_BRANCH).strip() or DEFAULT_GITHUB_BRANCH
 
     print("=" * 74)
-    print("  图像智能查重工作台 - GitHub 云端秒级热更新 (OTA) 发布中心")
+    print("  EVE_IDT - GitHub 云端秒级热更新 (OTA) 发布中心")
     print("=" * 74)
 
     save_config_everywhere(repo, branch)

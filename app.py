@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-印花图像查重工作台 v4.0 — Studio Dark Mode (app.py)
-严格遵循工业级现代中性暗色规范 (Neutral Slate/Zinc) 与双阶段状态解耦架构 (Phase-Based Layout)：
-- 底色体系：主背景 #18181b、卡片与面板 #202023、浮动工具栏 #27272a、1px 半透明描边 rgba(255,255,255,0.08)
-- 零系统 Emoji：全量采用 QPainter 绘制的 16px/20px Lucide 风格线性矢量图标
-- 阶段 1 (Import State)：48px 单行顶栏 + 对称双圆角拖拽卡 + 220×40px 居中主行动按钮「开始智能查重」
+EVE_IDT v4.1.3 — Studio Mode (app.py)
+文件说明: Eve_image_dedup_tool
+严格遵循工业级现代中性暗色/明亮规范与双阶段状态解耦架构 (Phase-Based Layout)：
+- 沉浸式标题栏：自适应无边框标题栏 (高度 38px)，消除 Windows 原生生硬白条，内嵌 EVE_IDT 品牌标识与版本
+- 底色体系：
+  * 暗色模式：主背景 #111113 / #18181b、卡片与面板 #202023、浮动工具栏 #27272a
+  * 浅色模式：主背景 #f8fafc、卡片与面板 #ffffff、边框 #cbd5e1 / #e2e8f0、高对比度清晰文本
+- 零系统 Emoji：全量采用 QPainter 绘制的 Lucide 风格线性矢量图标
+- 阶段 1 (Import State)：38px 沉浸标题栏 + 48px 操作栏 + 对称双圆角拖拽卡 + 居中「开始智能查重」
 - 阶段 2 (Review Workbench)：
-  * 左栏 (260px 可折叠)：双图微型缩略图卡片 + 相似度百分比 (99.4%) + 差异标签 + 搜索与排序
-  * 中栏 (双视口画布)：顶部 #27272a 浮动胶囊条 [1:1 复位 | 联动缩放/平移 | 像素差异热图 | 滑动卷帘对比] + 并排/卷帘视口 + 底部决策按钮
+  * 左栏 (260px 可折叠)：双图微型缩略图卡片 + 相似度百分比 + 差异标签 + 搜索与排序
+  * 中栏 (双视口画布)：顶部浮动胶囊条 [1:1 复位 | 联动缩放/平移 | 像素差异热图 | 滑动卷帘对比] + 并排/卷帘视口 + 底部决策按钮
   * 右栏 (240px 可折叠)：垂直对比文件名、分辨率、体积、格式、修改时间，自动高亮差异属性
-  * 底栏 (40px 状态 Dock)：靠左进度指示 | 靠中紧凑翻页 [← 上一组] [下一组 →] | 靠右极弱暗灰快捷键提示
+  * 底栏 (40px 状态 Dock)：靠左进度指示 | 靠中紧凑翻页 [← 上一组] [下一组 →] | 靠右快捷键提示
 """
 
 import os
@@ -23,6 +27,8 @@ import collections
 import threading
 import importlib.abc
 import importlib.util
+import ctypes
+from ctypes import wintypes
 from typing import List, Optional, Dict, Tuple
 
 
@@ -53,18 +59,25 @@ class _HotPatchMetaFinder(importlib.abc.MetaPathFinder):
 
 
 def _bootstrap_hotpatch():
-    """启动时检查 %LOCALAPPDATA%\\TableclothDedupPro\\hotpatch 下是否有更新的云端热补丁并无缝接管"""
+    """启动时检查 %LOCALAPPDATA%\\EVE_IDT\\hotpatch 下是否有更新的云端热补丁并无缝接管"""
     if getattr(sys, "_tdpro_hotpatch_bootstrapped", False):
         return
-    builtin_version = "4.1.2"
+    builtin_version = "4.1.3"
     local_base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~\\AppData\\Local")
-    hp_dir = os.path.join(local_base, "TableclothDedupPro", "hotpatch")
-    hp_manifest = os.path.join(hp_dir, "hotpatch_manifest.json")
-    hp_app_py = os.path.join(hp_dir, "app.py")
-
-    if not (os.path.isfile(hp_manifest) and os.path.isfile(hp_app_py)):
+    hp_candidates = [
+        os.path.join(local_base, "EVE_IDT", "hotpatch"),
+        os.path.join(local_base, "TableclothDedupPro", "hotpatch"),
+    ]
+    hp_dir = None
+    for cand in hp_candidates:
+        if os.path.isfile(os.path.join(cand, "hotpatch_manifest.json")) and os.path.isfile(os.path.join(cand, "app.py")):
+            hp_dir = cand
+            break
+    if not hp_dir:
         return
     try:
+        hp_manifest = os.path.join(hp_dir, "hotpatch_manifest.json")
+        hp_app_py = os.path.join(hp_dir, "app.py")
         with open(hp_manifest, "r", encoding="utf-8") as f:
             meta = json.load(f)
         hp_ver = str(meta.get("version", "")).strip()
@@ -81,18 +94,41 @@ def _bootstrap_hotpatch():
     except SystemExit:
         raise
     except Exception:
-        # 若热补丁异常，自动回退至内置稳定版本，绝不闪退
         sys._tdpro_hotpatch_bootstrapped = False
         os.environ.pop("TDPRO_ACTIVE_VERSION", None)
 
 
 _bootstrap_hotpatch()
 
+# Win32 原生消息结构体与边缘检测常量 (用于无边框窗口 8 向平滑拉伸)
+class _POINT(ctypes.Structure):
+    _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+
+class _MSG(ctypes.Structure):
+    _fields_ = [
+        ("hwnd", wintypes.HWND),
+        ("message", wintypes.UINT),
+        ("wParam", wintypes.WPARAM),
+        ("lParam", wintypes.LPARAM),
+        ("time", wintypes.DWORD),
+        ("pt", _POINT),
+    ]
+
+_WM_NCHITTEST = 0x0084
+_HTLEFT = 10
+_HTRIGHT = 11
+_HTTOP = 12
+_HTTOPLEFT = 13
+_HTTOPRIGHT = 14
+_HTBOTTOM = 15
+_HTBOTTOMLEFT = 16
+_HTBOTTOMRIGHT = 17
+
 import cv2
 import numpy as np
 from PySide6.QtCore import (
-    Qt, QThread, Signal, QPointF, QRectF, QSize, QMimeData,
-    QVariantAnimation, QEasingCurve, QTimer
+    Qt, QThread, Signal, QPoint, QPointF, QRectF, QSize, QMimeData,
+    QVariantAnimation, QEasingCurve, QTimer, QEvent
 )
 from PySide6.QtGui import (
     QPixmap, QImage, QImageReader, QColor, QFont, QPainter, QPen, QBrush, QPainterPath,
@@ -211,6 +247,22 @@ class LucideIcon:
             p.drawLine(QPointF(m + w * 0.18, m + w * 0.18), QPointF(m + w * 0.82, m + w * 0.82))
             p.drawLine(QPointF(m + w * 0.82, m + w * 0.18), QPointF(m + w * 0.18, m + w * 0.82))
 
+        elif name == "win-minimize":
+            p.drawLine(QPointF(m + w * 0.15, s * 0.5), QPointF(m + w * 0.85, s * 0.5))
+
+        elif name == "win-maximize":
+            p.drawRect(QRectF(m + w * 0.16, m + w * 0.16, w * 0.68, w * 0.68))
+
+        elif name == "win-restore":
+            rw = w * 0.58
+            rh = w * 0.58
+            p.drawRect(QRectF(m + w * 0.28, m + w * 0.12, rw, rh))
+            p.drawRect(QRectF(m + w * 0.12, m + w * 0.28, rw, rh))
+
+        elif name in ("win-close", "close-window"):
+            p.drawLine(QPointF(m + w * 0.20, m + w * 0.20), QPointF(m + w * 0.80, m + w * 0.80))
+            p.drawLine(QPointF(m + w * 0.80, m + w * 0.20), QPointF(m + w * 0.20, m + w * 0.80))
+
         elif name == "link":
             p.drawRoundedRect(QRectF(m, s * 0.34, w * 0.56, s * 0.32), 3.0, 3.0)
             p.drawRoundedRect(QRectF(m + w * 0.44, s * 0.34, w * 0.56, s * 0.32), 3.0, 3.0)
@@ -328,8 +380,8 @@ class LucideIcon:
         return px
 
     @staticmethod
-    def icon(name: str, size: int = 16, color: str = "#a1a1aa") -> QIcon:
-        return QIcon(LucideIcon.pixmap(name, size, color))
+    def icon(name: str, size: int = 16, color: str = "#a1a1aa", stroke_width: float = 1.5) -> QIcon:
+        return QIcon(LucideIcon.pixmap(name, size, color, stroke_width))
 
 
 # ==================== 2. 图像转换与辅助函数 ====================
@@ -677,6 +729,229 @@ def shorten_path(path: str, max_chars: int = 26) -> str:
     return "..." + norm[-(max_chars - 3):]
 
 
+# ==================== 2. 自适应沉浸式无边框标题栏 (零 Windows 原生白条) ====================
+
+class EVETitleBar(QWidget):
+    """
+    自适应现代沉浸式无边框标题栏 (高度 38px):
+    1. 左侧：品牌 Logo 图标 + 软件名称 EVE_IDT + 版本胶囊 v4.1.3 + 文件说明 Eve_image_dedup_tool
+    2. 中间：空白拖拽移动区（左键拖拽平滑移动窗口，双击最大化/还原）
+    3. 右侧：原生对齐的最小化、最大化/还原、关闭三件套按钮（悬停背景自适应，关闭按钮红底白字）
+    4. 完美适配深色模式 (#111113) 与浅色模式 (#ffffff)
+    """
+
+    def __init__(self, main_window, parent=None):
+        super().__init__(parent or main_window)
+        self.main_window = main_window
+        self._theme = "dark"
+        self.setFixedHeight(38)
+        self.setObjectName("EVETitleBar")
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 0, 0, 0)
+        layout.setSpacing(10)
+
+        # 品牌 Logo 图标
+        self.lbl_icon = QLabel()
+        self.lbl_icon.setPixmap(LucideIcon.pixmap("layers", 18, "#3b82f6", 1.8))
+        self.lbl_icon.setStyleSheet("background: transparent; border: none;")
+        layout.addWidget(self.lbl_icon)
+
+        # 软件名称 EVE_IDT
+        self.lbl_title = QLabel("EVE_IDT")
+        self.lbl_title.setStyleSheet(
+            "font-size: 13px; font-weight: 700; color: #f4f4f5; background: transparent; border: none; letter-spacing: 0.5px;"
+        )
+        layout.addWidget(self.lbl_title)
+
+        # 版本号胶囊
+        self.lbl_version = QLabel(f"v{APP_VERSION}")
+        self.lbl_version.setStyleSheet(
+            "background-color: #27272a; color: #a1a1aa; font-size: 10px; font-weight: 600; "
+            "padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.08);"
+        )
+        layout.addWidget(self.lbl_version)
+
+        # 副标文件说明 Eve_image_dedup_tool
+        self.lbl_desc = QLabel("Eve_image_dedup_tool")
+        self.lbl_desc.setStyleSheet("color: #71717a; font-size: 11px; background: transparent; border: none;")
+        layout.addWidget(self.lbl_desc)
+
+        layout.addStretch(1)
+
+        # 右侧窗口控制三件套按钮 (各宽 46px, 紧凑无缝排列)
+        btn_box = QHBoxLayout()
+        btn_box.setContentsMargins(0, 0, 0, 0)
+        btn_box.setSpacing(0)
+
+        self.btn_min = QPushButton()
+        self.btn_min.setFixedSize(46, 38)
+        self.btn_min.setCursor(Qt.ArrowCursor)
+        self.btn_min.setIcon(LucideIcon.icon("win-minimize", 12, "#a1a1aa", 1.2))
+        self.btn_min.setToolTip("最小化")
+        self.btn_min.clicked.connect(self.main_window.showMinimized)
+        btn_box.addWidget(self.btn_min)
+
+        self.btn_max = QPushButton()
+        self.btn_max.setFixedSize(46, 38)
+        self.btn_max.setCursor(Qt.ArrowCursor)
+        self.btn_max.setIcon(LucideIcon.icon("win-maximize", 12, "#a1a1aa", 1.2))
+        self.btn_max.setToolTip("最大化")
+        self.btn_max.clicked.connect(self._toggle_maximize)
+        btn_box.addWidget(self.btn_max)
+
+        self.btn_close = QPushButton()
+        self.btn_close.setFixedSize(46, 38)
+        self.btn_close.setCursor(Qt.ArrowCursor)
+        self.btn_close.setIcon(LucideIcon.icon("win-close", 12, "#a1a1aa", 1.3))
+        self.btn_close.setToolTip("关闭")
+        self.btn_close.clicked.connect(self.main_window.close)
+        self.btn_close.installEventFilter(self)
+        btn_box.addWidget(self.btn_close)
+
+        layout.addLayout(btn_box)
+
+        self._refresh_styles()
+
+    def _toggle_maximize(self):
+        if self.main_window.isMaximized():
+            self.main_window.showNormal()
+        else:
+            self.main_window.showMaximized()
+
+    def update_max_icon(self):
+        is_max = self.main_window.isMaximized()
+        icon_name = "win-restore" if is_max else "win-maximize"
+        icon_color = "#475569" if self._theme == "light" else "#a1a1aa"
+        self.btn_max.setIcon(LucideIcon.icon(icon_name, 12, icon_color, 1.2))
+        self.btn_max.setToolTip("还原" if is_max else "最大化")
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton:
+            wh = self.main_window.windowHandle()
+            if wh is not None:
+                wh.startSystemMove()
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton:
+            self._toggle_maximize()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
+    def eventFilter(self, obj, event):
+        if obj == self.btn_close:
+            if event.type() == QEvent.Enter:
+                self.btn_close.setIcon(LucideIcon.icon("win-close", 12, "#ffffff", 1.4))
+            elif event.type() == QEvent.Leave:
+                icon_color = "#475569" if self._theme == "light" else "#a1a1aa"
+                self.btn_close.setIcon(LucideIcon.icon("win-close", 12, icon_color, 1.3))
+        return super().eventFilter(obj, event)
+
+    def set_theme(self, theme: str):
+        self._theme = theme
+        self._refresh_styles()
+
+    def _refresh_styles(self):
+        is_light = (self._theme == "light")
+        icon_color = "#475569" if is_light else "#a1a1aa"
+
+        self.btn_min.setIcon(LucideIcon.icon("win-minimize", 12, icon_color, 1.2))
+        self.update_max_icon()
+        self.btn_close.setIcon(LucideIcon.icon("win-close", 12, icon_color, 1.3))
+
+        if is_light:
+            self.setStyleSheet("""
+                QWidget#EVETitleBar {
+                    background-color: #ffffff;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+            """)
+            self.lbl_title.setStyleSheet(
+                "font-size: 13px; font-weight: 700; color: #0f172a; background: transparent; border: none; letter-spacing: 0.5px;"
+            )
+            self.lbl_version.setStyleSheet(
+                "background-color: #f1f5f9; color: #475569; font-size: 10px; font-weight: 600; "
+                "padding: 1px 6px; border-radius: 4px; border: 1px solid #cbd5e1;"
+            )
+            self.lbl_desc.setStyleSheet("color: #64748b; font-size: 11px; background: transparent; border: none;")
+
+            btn_norm_css = """
+                QPushButton {
+                    background-color: transparent;
+                    border: none;
+                    border-radius: 0px;
+                }
+                QPushButton:hover {
+                    background-color: #e2e8f0;
+                }
+                QPushButton:pressed {
+                    background-color: #cbd5e1;
+                }
+            """
+            btn_close_css = """
+                QPushButton {
+                    background-color: transparent;
+                    border: none;
+                    border-radius: 0px;
+                }
+                QPushButton:hover {
+                    background-color: #ef4444;
+                }
+                QPushButton:pressed {
+                    background-color: #dc2626;
+                }
+            """
+        else:
+            self.setStyleSheet("""
+                QWidget#EVETitleBar {
+                    background-color: #111113;
+                    border-bottom: 1px solid #1f1f23;
+                }
+            """)
+            self.lbl_title.setStyleSheet(
+                "font-size: 13px; font-weight: 700; color: #f4f4f5; background: transparent; border: none; letter-spacing: 0.5px;"
+            )
+            self.lbl_version.setStyleSheet(
+                "background-color: #27272a; color: #a1a1aa; font-size: 10px; font-weight: 600; "
+                "padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.08);"
+            )
+            self.lbl_desc.setStyleSheet("color: #71717a; font-size: 11px; background: transparent; border: none;")
+
+            btn_norm_css = """
+                QPushButton {
+                    background-color: transparent;
+                    border: none;
+                    border-radius: 0px;
+                }
+                QPushButton:hover {
+                    background-color: #27272a;
+                }
+                QPushButton:pressed {
+                    background-color: #3f3f46;
+                }
+            """
+            btn_close_css = """
+                QPushButton {
+                    background-color: transparent;
+                    border: none;
+                    border-radius: 0px;
+                }
+                QPushButton:hover {
+                    background-color: #ef4444;
+                }
+                QPushButton:pressed {
+                    background-color: #dc2626;
+                }
+            """
+        self.btn_min.setStyleSheet(btn_norm_css)
+        self.btn_max.setStyleSheet(btn_norm_css)
+        self.btn_close.setStyleSheet(btn_close_css)
+
+
 # ==================== 3. 顶部 48px 单行工具栏组件 ====================
 
 class SegmentedControl(QFrame):
@@ -774,15 +1049,15 @@ class SegmentedControl(QFrame):
             idle_css = """
                 QPushButton {
                     background-color: transparent;
-                    color: #71717a;
+                    color: #475569;
                     font-size: 12px;
-                    font-weight: 400;
+                    font-weight: 500;
                     border-radius: 4px;
                     padding: 0 12px;
                     border: none;
                 }
                 QPushButton:hover {
-                    color: #18181b;
+                    color: #0f172a;
                     background-color: rgba(0, 0, 0, 0.05);
                 }
             """
@@ -812,16 +1087,16 @@ class SegmentedControl(QFrame):
 
         outer = QRectF(0.5, 0.5, self.width() - 1.0, self.height() - 1.0)
         is_light = (self._theme == "light")
-        p.setBrush(QColor("#e4e4e7" if is_light else "#18181b"))
+        p.setBrush(QColor("#f1f5f9" if is_light else "#18181b"))
 
         # 外框描边随切换产生微光呼吸过渡
         g = self._glow_progress
         if is_light:
             border_col = QColor(
-                int(212 * (1 - g) + 59 * g),
-                int(212 * (1 - g) + 130 * g),
-                int(216 * (1 - g) + 246 * g),
-                int(160 + 95 * g)
+                int(203 * (1 - g) + 59 * g),
+                int(213 * (1 - g) + 130 * g),
+                int(225 * (1 - g) + 246 * g),
+                int(180 + 75 * g)
             )
         else:
             border_col = QColor(
@@ -914,23 +1189,23 @@ class CompactPathInput(QPushButton):
             return
 
         if self._path and os.path.isdir(self._path):
-            self.setIcon(LucideIcon.icon("folder", 15, "#52525b" if is_light else "#a1a1aa"))
+            self.setIcon(LucideIcon.icon("folder", 15, "#475569" if is_light else "#a1a1aa"))
             self.setText(f" {shorten_path(self._path, 24)}")
             self.setToolTip(f"{self._path}\n点击更换目录，或直接拖入新文件夹")
             if is_light:
                 self.setStyleSheet("""
                     QPushButton {
                         background-color: #ffffff;
-                        border: 1px solid #d4d4d8;
+                        border: 1px solid #cbd5e1;
                         border-radius: 6px;
-                        color: #18181b;
+                        color: #0f172a;
                         font-size: 12px;
                         padding: 0 10px;
                         text-align: left;
                     }
                     QPushButton:hover {
-                        background-color: #f4f4f5;
-                        border-color: #a1a1aa;
+                        background-color: #f8fafc;
+                        border-color: #94a3b8;
                     }
                 """)
             else:
@@ -950,24 +1225,24 @@ class CompactPathInput(QPushButton):
                     }
                 """)
         else:
-            self.setIcon(LucideIcon.icon("folder", 15, "#a1a1aa" if is_light else "#71717a"))
+            self.setIcon(LucideIcon.icon("folder", 15, "#64748b" if is_light else "#71717a"))
             self.setText(f" {self.placeholder}")
             self.setToolTip("点击浏览文件夹，或直接拖入文件夹")
             if is_light:
                 self.setStyleSheet("""
                     QPushButton {
                         background-color: #ffffff;
-                        border: 1px solid #e4e4e7;
+                        border: 1px solid #cbd5e1;
                         border-radius: 6px;
-                        color: #71717a;
+                        color: #64748b;
                         font-size: 12px;
                         padding: 0 10px;
                         text-align: left;
                     }
                     QPushButton:hover {
-                        background-color: #f4f4f5;
-                        color: #18181b;
-                        border-color: #d4d4d8;
+                        background-color: #f8fafc;
+                        color: #0f172a;
+                        border-color: #94a3b8;
                     }
                 """)
             else:
@@ -1146,7 +1421,7 @@ class SensitivitySelector(QToolButton):
                 border: none;
                 border-radius: 6px;
                 padding: 0 12px 0 22px;
-                color: {'#18181b' if is_light else '#e4e4e7'};
+                color: {'#0f172a' if is_light else '#e4e4e7'};
                 font-size: 12px;
                 font-weight: 500;
             }}
@@ -1158,7 +1433,7 @@ class SensitivitySelector(QToolButton):
         self._menu.setStyleSheet(f"""
             QMenu {{
                 background-color: {'#ffffff' if is_light else '#202023'};
-                border: 1px solid {'#e4e4e7' if is_light else 'rgba(255, 255, 255, 0.12)'};
+                border: 1px solid {'#cbd5e1' if is_light else 'rgba(255, 255, 255, 0.12)'};
                 border-radius: 8px;
                 padding: 8px;
             }}
@@ -1210,7 +1485,7 @@ class SensitivitySelector(QToolButton):
         rect = QRectF(0.5, 0.5, self.width() - 1.0, self.height() - 1.0)
 
         if is_light:
-            bg_base = QColor("#e4e4e7") if hovered else QColor("#ffffff")
+            bg_base = QColor("#f1f5f9") if hovered else QColor("#ffffff")
         else:
             bg_base = QColor("#27272a") if hovered else QColor("#18181b")
         p.setBrush(bg_base)
@@ -1222,9 +1497,10 @@ class SensitivitySelector(QToolButton):
             p.drawRoundedRect(rect, 6.0, 6.0)
 
         border_alpha = int(38 + 180 * pulse) if pulse > 0.01 else (48 if hovered else 24)
-        border_col = QColor(r, g, b, border_alpha) if pulse > 0.01 else (
-            QColor(0, 0, 0, border_alpha) if is_light else QColor(255, 255, 255, border_alpha)
-        )
+        if is_light:
+            border_col = QColor(r, g, b, border_alpha) if pulse > 0.01 else QColor("#94a3b8" if hovered else "#cbd5e1")
+        else:
+            border_col = QColor(r, g, b, border_alpha) if pulse > 0.01 else QColor(255, 255, 255, border_alpha)
         p.setBrush(Qt.NoBrush)
         p.setPen(QPen(border_col, 1.2 if pulse > 0.15 else 1.0))
         p.drawRoundedRect(rect, 6.0, 6.0)
@@ -1536,22 +1812,25 @@ class SensitivityInteractiveBar(QFrame):
         self.theme = theme
         is_light = (theme == "light")
         if hasattr(self, "lbl_prefix"):
-            self.lbl_prefix.setStyleSheet("color: #71717a; font-size: 11px; font-weight: 600; background: transparent; border: none;")
+            self.lbl_prefix.setStyleSheet(
+                f"color: {'#475569' if is_light else '#71717a'}; font-size: 11px; font-weight: 600; background: transparent; border: none;"
+            )
         if hasattr(self, "btn_expand"):
             if is_light:
                 self.btn_expand.setStyleSheet("""
                     QPushButton {
-                        background-color: #f4f4f5;
-                        color: #52525b;
-                        border: 1px solid #e4e4e7;
+                        background-color: #f1f5f9;
+                        color: #475569;
+                        border: 1px solid #cbd5e1;
                         border-radius: 4px;
                         padding: 0 8px;
                         font-size: 11px;
+                        font-weight: 500;
                     }
                     QPushButton:hover {
-                        background-color: #e4e4e7;
-                        color: #18181b;
-                        border-color: #d4d4d8;
+                        background-color: #e2e8f0;
+                        color: #0f172a;
+                        border-color: #94a3b8;
                     }
                 """)
             else:
@@ -1651,9 +1930,9 @@ class SensitivityInteractiveBar(QFrame):
 
         if is_light:
             border_col = (
-                QColor(r, g, b, int(60 + 175 * pulse))
+                QColor(r, g, b, int(80 + 175 * pulse))
                 if pulse > 0.01
-                else QColor("#e4e4e7")
+                else QColor("#cbd5e1")
             )
         else:
             border_col = (
@@ -1688,13 +1967,13 @@ class SensitivityInteractiveBar(QFrame):
 
         if self._prev_key != self._current_key and t_prog < 0.99:
             p.setOpacity(max(0.0, (1.0 - t_prog) ** 1.4))
-            p.setPen(QColor("#71717a"))
+            p.setPen(QColor("#64748b" if is_light else "#71717a"))
             out_rect = QRectF(16.0, 38.0 - 14.0 * t_prog, self.width() - 32.0, 34.0)
             p.drawText(out_rect, Qt.AlignLeft | Qt.AlignVCenter | Qt.TextWordWrap, prev_spec["desc"])
 
         p.setOpacity(max(0.05, t_prog))
         if is_light:
-            text_color = QColor("#18181b" if pulse > 0.2 else "#3f3f46")
+            text_color = QColor("#0f172a" if pulse > 0.2 else "#334155")
         else:
             text_color = QColor("#e4e4e7" if pulse > 0.2 else "#b4b4bb")
         p.setPen(text_color)
@@ -1709,13 +1988,13 @@ class SensitivityInteractiveBar(QFrame):
             p.setClipRect(QRectF(12.0, 76.0, self.width() - 24.0, self.height() - 82.0))
 
             # 分隔细线
-            divider_col = QColor(0, 0, 0, 18) if is_light else QColor(255, 255, 255, 18)
+            divider_col = QColor("#e2e8f0") if is_light else QColor(255, 255, 255, 18)
             p.setPen(QPen(divider_col, 1.0))
             p.drawLine(QPointF(16.0, 78.0), QPointF(self.width() - 16.0, 78.0))
 
             dy = (1.0 - t_prog) * 8.0
-            body_col_1 = QColor("#18181b") if is_light else QColor("#d4d4d8")
-            body_col_2 = QColor("#52525b") if is_light else QColor("#a1a1aa")
+            body_col_1 = QColor("#0f172a") if is_light else QColor("#d4d4d8")
+            body_col_2 = QColor("#334155") if is_light else QColor("#a1a1aa")
             tag_col_1 = QColor("#059669") if is_light else QColor("#10b981")
             tag_col_2 = QColor("#d97706") if is_light else QColor("#f59e0b")
             rows = [
@@ -1927,9 +2206,9 @@ class StudioDropCard(QFrame):
         else:
             if is_light:
                 self.lbl_role_badge.setStyleSheet(
-                    "background-color: #f4f4f5; color: #52525b; "
-                    "border: 1px solid #e4e4e7; border-radius: 4px; "
-                    "padding: 1px 8px; font-size: 11px; font-weight: 500;"
+                    "background-color: #f1f5f9; color: #334155; "
+                    "border: 1px solid #cbd5e1; border-radius: 4px; "
+                    "padding: 1px 8px; font-size: 11px; font-weight: 600;"
                 )
             else:
                 self.lbl_role_badge.setStyleSheet(
@@ -1939,10 +2218,10 @@ class StudioDropCard(QFrame):
                 )
 
         self.lbl_title.setStyleSheet(
-            f"font-size: 16px; font-weight: 600; color: {'#18181b' if is_light else '#f4f4f5'}; background: transparent; border: none;"
+            f"font-size: 16px; font-weight: 600; color: {'#0f172a' if is_light else '#f4f4f5'}; background: transparent; border: none;"
         )
         self.lbl_sub.setStyleSheet(
-            "font-size: 12px; color: #71717a; background: transparent; border: none;"
+            f"font-size: 12px; color: {'#64748b' if is_light else '#71717a'}; background: transparent; border: none;"
         )
 
         if drag_hover:
@@ -1954,7 +2233,7 @@ class StudioDropCard(QFrame):
             self.lbl_sub.setText(shorten_path(self._path, 36))
             self.setToolTip(f"{self._path}\n点击重新选择，或拖入新文件夹")
         else:
-            self.lbl_icon.setPixmap(LucideIcon.pixmap("folder-plus", 28, "#a1a1aa" if is_light else "#71717a", 1.5))
+            self.lbl_icon.setPixmap(LucideIcon.pixmap("folder-plus", 28, "#64748b" if is_light else "#71717a", 1.5))
             self.lbl_title.setText(self.default_title)
             self.lbl_sub.setText(self.default_subtitle)
             self.setToolTip("")
@@ -1980,7 +2259,7 @@ class StudioDropCard(QFrame):
         is_light = (getattr(self, "theme", "dark") == "light")
 
         if is_light:
-            bg = QColor("#f4f4f5") if hovered else QColor("#ffffff")
+            bg = QColor("#f8fafc") if hovered else QColor("#ffffff")
         else:
             bg = QColor("#242428") if hovered else QColor("#202023")
         p.setBrush(bg)
@@ -1992,13 +2271,16 @@ class StudioDropCard(QFrame):
             p.drawRoundedRect(rect, 12.0, 12.0)
 
         if self._drag_hover:
-            pen = QPen(QColor("#2563eb"), 1.5, Qt.SolidLine)
+            pen = QPen(QColor("#2563eb"), 1.8, Qt.SolidLine)
         elif pulse > 0.05:
-            pen = QPen(QColor(59, 130, 246, int(60 + 185 * pulse)), 1.4, Qt.SolidLine)
+            pen = QPen(QColor(59, 130, 246, int(60 + 185 * pulse)), 1.5, Qt.SolidLine)
         elif has_dir:
-            pen = QPen(QColor("#2563eb") if hovered else QColor(37, 99, 235, 115), 1.0, Qt.SolidLine)
+            pen = QPen(QColor("#2563eb") if hovered else QColor(37, 99, 235, 180), 1.2, Qt.SolidLine)
         else:
-            pen = QPen(QColor(0, 0, 0, 48 if hovered else 24) if is_light else QColor(255, 255, 255, 56 if hovered else 31), 1.0, Qt.DashLine)
+            if is_light:
+                pen = QPen(QColor("#3b82f6" if hovered else "#cbd5e1"), 1.2, Qt.DashLine)
+            else:
+                pen = QPen(QColor(255, 255, 255, 60 if hovered else 32), 1.0, Qt.DashLine)
 
         p.setBrush(Qt.NoBrush)
         p.setPen(pen)
@@ -3544,7 +3826,13 @@ class DedupMainWindow(QMainWindow):
         self._sync_zoom_enabled: bool = True
         self._view_mode: str = "dual"  # "dual" | "heatmap" | "curtain"
 
-        self.setWindowTitle(f"图像智能查重工作台 v{APP_VERSION}")
+        self.setWindowTitle(f"EVE_IDT v{APP_VERSION}")
+        self.setWindowFlags(
+            Qt.Window
+            | Qt.FramelessWindowHint
+            | Qt.WindowSystemMenuHint
+            | Qt.WindowMinMaxButtonsHint
+        )
         self.resize(1480, 900)
         self.setMinimumSize(1160, 720)
         self.setAcceptDrops(True)
@@ -3567,6 +3855,41 @@ class DedupMainWindow(QMainWindow):
     def _trigger_idle_gc(self):
         import gc
         gc.collect()
+
+    def nativeEvent(self, eventType, message):
+        if eventType == b"windows_generic_MSG":
+            msg = _MSG.from_address(int(message))
+            if msg.message == _WM_NCHITTEST:
+                if not self.isMaximized():
+                    x = msg.pt.x
+                    y = msg.pt.y
+                    pos = self.mapFromGlobal(QPoint(x, y))
+                    bw = 6
+                    w = self.width()
+                    h = self.height()
+                    if pos.x() < bw and pos.y() < bw:
+                        return True, _HTTOPLEFT
+                    if pos.x() > w - bw and pos.y() < bw:
+                        return True, _HTTOPRIGHT
+                    if pos.x() < bw and pos.y() > h - bw:
+                        return True, _HTBOTTOMLEFT
+                    if pos.x() > w - bw and pos.y() > h - bw:
+                        return True, _HTBOTTOMRIGHT
+                    if pos.x() < bw:
+                        return True, _HTLEFT
+                    if pos.x() > w - bw:
+                        return True, _HTRIGHT
+                    if pos.y() < bw:
+                        return True, _HTTOP
+                    if pos.y() > h - bw:
+                        return True, _HTBOTTOM
+        return super().nativeEvent(eventType, message)
+
+    def changeEvent(self, event):
+        if event.type() == QEvent.WindowStateChange:
+            if hasattr(self, "custom_titlebar"):
+                self.custom_titlebar.update_max_icon()
+        super().changeEvent(event)
 
     def closeEvent(self, event):
         if hasattr(self, "prefetch_worker") and self.prefetch_worker.isRunning():
@@ -3592,12 +3915,16 @@ class DedupMainWindow(QMainWindow):
         is_light = (theme == "light")
         self.engine.state_store.set_setting("theme_mode", theme)
 
+        # 0. 自定义沉浸式标题栏主题应用
+        if hasattr(self, "custom_titlebar"):
+            self.custom_titlebar.set_theme(theme)
+
         # 1. 顶层窗口 QSS
         if is_light:
             self.setStyleSheet("""
                 QMainWindow, QWidget {
-                    background-color: #f4f4f5;
-                    color: #18181b;
+                    background-color: #f8fafc;
+                    color: #0f172a;
                     font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
                 }
                 QPushButton, QToolButton, QComboBox {
@@ -3605,28 +3932,28 @@ class DedupMainWindow(QMainWindow):
                 }
                 QComboBox {
                     background-color: #ffffff;
-                    border: 1px solid #e4e4e7;
+                    border: 1px solid #cbd5e1;
                     border-radius: 6px;
                     padding: 4px 10px;
-                    color: #18181b;
+                    color: #0f172a;
                     font-size: 12px;
                 }
                 QComboBox:hover {
-                    border-color: #cbd5e1;
+                    border-color: #94a3b8;
                 }
                 QComboBox QAbstractItemView {
                     background-color: #ffffff;
-                    color: #18181b;
-                    border: 1px solid #e4e4e7;
+                    color: #0f172a;
+                    border: 1px solid #cbd5e1;
                     selection-background-color: #2563eb;
                     selection-color: #ffffff;
                 }
                 QLineEdit {
                     background-color: #ffffff;
-                    border: 1px solid #e4e4e7;
+                    border: 1px solid #cbd5e1;
                     border-radius: 6px;
                     padding: 4px 8px;
-                    color: #18181b;
+                    color: #0f172a;
                     font-size: 12px;
                 }
                 QLineEdit:focus {
@@ -3639,12 +3966,12 @@ class DedupMainWindow(QMainWindow):
                 }
                 QListWidget::item {
                     background-color: #ffffff;
-                    border: 1px solid #e4e4e7;
+                    border: 1px solid #e2e8f0;
                     border-radius: 6px;
                     margin-bottom: 6px;
                 }
                 QListWidget::item:hover {
-                    background-color: #f8fafc;
+                    background-color: #f1f5f9;
                     border-color: #cbd5e1;
                 }
                 QListWidget::item:selected {
@@ -3653,10 +3980,10 @@ class DedupMainWindow(QMainWindow):
                 }
                 QMenu {
                     background-color: #ffffff;
-                    border: 1px solid #e4e4e7;
+                    border: 1px solid #e2e8f0;
                     border-radius: 6px;
                     padding: 4px;
-                    color: #18181b;
+                    color: #0f172a;
                     font-size: 12px;
                 }
                 QMenu::item {
@@ -3668,31 +3995,26 @@ class DedupMainWindow(QMainWindow):
                     color: #ffffff;
                 }
                 QScrollBar:vertical {
-                    background-color: #f4f4f5;
+                    background-color: #f8fafc;
                     width: 12px;
                     margin: 0px;
                     border-radius: 6px;
                 }
                 QScrollBar:horizontal {
-                    background-color: #f4f4f5;
+                    background-color: #f8fafc;
                     height: 12px;
                     margin: 0px;
                     border-radius: 6px;
                 }
-                QScrollBar::handle:vertical {
-                    background-color: #d4d4d8;
+                QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+                    background-color: #cbd5e1;
                     min-height: 36px;
-                    border-radius: 5px;
-                    margin: 2px;
-                }
-                QScrollBar::handle:horizontal {
-                    background-color: #d4d4d8;
                     min-width: 36px;
                     border-radius: 5px;
                     margin: 2px;
                 }
                 QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {
-                    background-color: #a1a1aa;
+                    background-color: #94a3b8;
                 }
                 QScrollBar::handle:vertical:pressed, QScrollBar::handle:horizontal:pressed {
                     background-color: #2563eb;
@@ -3710,8 +4032,8 @@ class DedupMainWindow(QMainWindow):
                 }
                 QToolTip {
                     background-color: #ffffff;
-                    color: #18181b;
-                    border: 1px solid #e4e4e7;
+                    color: #0f172a;
+                    border: 1px solid #cbd5e1;
                     border-radius: 6px;
                     padding: 8px 10px;
                     font-size: 12px;
@@ -3847,28 +4169,28 @@ class DedupMainWindow(QMainWindow):
                 self.top_toolbar.setStyleSheet("""
                     QFrame#TopToolbar {
                         background-color: #ffffff;
-                        border-bottom: 1px solid #e4e4e7;
+                        border-bottom: 1px solid #e2e8f0;
                     }
                 """)
             if hasattr(self, "bottom_dock"):
                 self.bottom_dock.setStyleSheet("""
                     QFrame#BottomDock {
                         background-color: #ffffff;
-                        border-top: 1px solid #e4e4e7;
+                        border-top: 1px solid #e2e8f0;
                     }
                 """)
             if hasattr(self, "left_drawer"):
                 self.left_drawer.setStyleSheet("""
                     QFrame#LeftDrawer {
                         background-color: #ffffff;
-                        border-right: 1px solid #e4e4e7;
+                        border-right: 1px solid #e2e8f0;
                     }
                 """)
             if hasattr(self, "floating_capsule"):
                 self.floating_capsule.setStyleSheet("""
                     QFrame#FloatingCapsule {
                         background-color: #ffffff;
-                        border: 1px solid #e4e4e7;
+                        border: 1px solid #cbd5e1;
                         border-radius: 18px;
                     }
                 """)
@@ -3904,7 +4226,7 @@ class DedupMainWindow(QMainWindow):
                 """)
 
         # 3. 顶栏按钮样式与主题切换按钮
-        icon_color = "#52525b" if is_light else "#a1a1aa"
+        icon_color = "#475569" if is_light else "#a1a1aa"
         if hasattr(self, "btn_toggle_left"):
             self.btn_toggle_left.setIcon(LucideIcon.icon("panel-left", 16, icon_color))
             self.btn_toggle_left.setStyleSheet(self._icon_btn_css())
@@ -3925,10 +4247,10 @@ class DedupMainWindow(QMainWindow):
                 self.btn_theme_toggle.setToolTip("切换为浅色模式 (快捷键 F2)")
             self.btn_theme_toggle.setStyleSheet(self._icon_btn_css())
 
-        if hasattr(self, "lbl_top_title"):
+        if getattr(self, "lbl_top_title", None) is not None:
             title_color = "#18181b" if is_light else "#f4f4f5"
             self.lbl_top_title.setStyleSheet(f"color: {title_color}; font-size: 14px; font-weight: 600; border: none;")
-        if hasattr(self, "lbl_top_ver"):
+        if getattr(self, "lbl_top_ver", None) is not None:
             ver_bg = "#e4e4e7" if is_light else "#27272a"
             ver_fg = "#52525b" if is_light else "#71717a"
             self.lbl_top_ver.setStyleSheet(
@@ -4019,6 +4341,10 @@ class DedupMainWindow(QMainWindow):
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
+        # 自定义现代沉浸式无边框标题栏 (高度 38px，消除 Windows 原生白条)
+        self.custom_titlebar = EVETitleBar(self)
+        root_layout.addWidget(self.custom_titlebar)
+
         # ==================== 1. 顶部单行工具栏 (高 48px) ====================
         self.top_toolbar = QFrame()
         self.top_toolbar.setFixedHeight(48)
@@ -4043,19 +4369,8 @@ class DedupMainWindow(QMainWindow):
         self.btn_toggle_left.clicked.connect(lambda: self.left_drawer.setVisible(not self.left_drawer.isVisible()))
         tb_layout.addWidget(self.btn_toggle_left)
 
-        # 应用标题与版本号
-        self.lbl_top_title = QLabel("图像智能查重工作台")
-        self.lbl_top_title.setStyleSheet("color: #f4f4f5; font-size: 14px; font-weight: 600; border: none;")
-        tb_layout.addWidget(self.lbl_top_title)
-
-        self.lbl_top_ver = QLabel(f"v{APP_VERSION}")
-        self.lbl_top_ver.setStyleSheet(
-            "background-color: #27272a; color: #71717a; font-size: 11px; "
-            "padding: 1px 6px; border-radius: 4px; border: none;"
-        )
-        tb_layout.addWidget(self.lbl_top_ver)
-
-        tb_layout.addSpacing(4)
+        self.lbl_top_title = None
+        self.lbl_top_ver = None
 
         # 分段控制器：单文件夹查重 vs 跨文件夹交叉比对
         self.seg_mode = SegmentedControl()
@@ -5767,7 +6082,7 @@ class DedupMainWindow(QMainWindow):
     def _show_about_dialog(self):
         hw_code = MachineFingerprint.get_machine_code()
         dlg = QDialog(self)
-        dlg.setWindowTitle(f"使用指南与常见问题帮助中心 — 图像智能查重工作台 v{APP_VERSION}")
+        dlg.setWindowTitle(f"使用指南与常见问题帮助中心 — EVE_IDT v{APP_VERSION}")
         dlg.resize(760, 650)
         dlg.setStyleSheet("""
             QDialog {
@@ -5911,7 +6226,7 @@ def main():
             pass
 
     app = QApplication(sys.argv)
-    app.setApplicationName("图像智能查重工作台")
+    app.setApplicationName("EVE_IDT")
     app.setApplicationVersion(APP_VERSION)
 
     # 构建并绑定多尺寸矢量应用图标 (窗口标题栏 + Windows 任务栏)
