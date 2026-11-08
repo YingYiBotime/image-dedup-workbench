@@ -6119,6 +6119,14 @@ class DedupMainWindow(QMainWindow):
                 (16, 185, 129)
             )
 
+    def set_target_folder(self, folder_path: str):
+        """支持命令行参数与 Windows 资源管理器右键菜单：自动载入指定文件夹并切入准备态"""
+        if folder_path and os.path.isdir(folder_path):
+            norm = os.path.normpath(folder_path)
+            self._on_folder_selected(1, norm)
+            if getattr(self, "current_phase", None) != self.PHASE_IMPORT:
+                self._switch_phase(self.PHASE_IMPORT)
+
     def _open_trash_dir(self):
         """安全打开回收暂存区文件夹，并在打开前智能平滑迁移旧版本遗留的暂存图片"""
         try:
@@ -6321,6 +6329,13 @@ def main():
     win = DedupMainWindow(paths=paths)
     win.setWindowIcon(app_icon)
     instance_guard.activationRequested.connect(lambda: SingleInstanceGuard.bring_window_to_front(win))
+
+    # 处理命令行参数（支持 Windows 资源管理器右键快速查重或快捷方式传参）
+    for arg in sys.argv[1:]:
+        if arg and not arg.startswith("-") and os.path.isdir(arg):
+            win.set_target_folder(os.path.abspath(arg))
+            break
+
     win.show()
 
     exit_code = app.exec()
