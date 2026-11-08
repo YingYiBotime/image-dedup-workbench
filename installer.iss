@@ -3,14 +3,15 @@
 ; 文件说明: Eve_image_dedup_tool
 ; 核心能力：
 ; 1. 严格遵循 Windows 64-bit Program Files 标准安装规范与数字签名/卸载向导；
-; 2. 原生系统级资源管理器右键扩展："使用 EVE_IDT 快速查重此文件夹"（带应用矢量图标）；
-; 3. 开机自启动可选配置（HKCU Run 注册表键）；
-; 4. SingleInstanceGuard 内核互斥锁检测（防止覆盖正在运行的程序）；
-; 5. 卸载时智能询问是否保留回收暂存区 (staging_trash) 与白名单数据。
+; 2. 100% 完备的中英双语本地化切换 (基于 [CustomMessages])；
+; 3. 原生系统级资源管理器右键扩展："使用 EVE_IDT 快速查重此文件夹" / "Quick Deduplicate with EVE_IDT"；
+; 4. 开机自启动可选配置（HKCU Run 注册表键）；
+; 5. SingleInstanceGuard 内核互斥锁检测（防止覆盖正在运行的程序）；
+; 6. 卸载时智能询问是否保留回收暂存区 (staging_trash) 与白名单数据。
 ; ==============================================================================
 
 #define MyAppName "EVE_IDT"
-#define MyAppDisplayName "EVE_IDT 图像智能查重工具"
+#define MyAppDisplayName "EVE_IDT"
 #define MyAppDescription "Eve_image_dedup_tool"
 #define MyAppVersion "4.1.4"
 #define MyAppPublisher "EVE_IDT Studio"
@@ -57,10 +58,38 @@ RestartApplications=no
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+chinesesimplified.TaskDesktopIcon=创建桌面快捷方式
+english.TaskDesktopIcon=Create a desktop shortcut
+
+chinesesimplified.GroupShortcuts=快捷方式设置:
+english.GroupShortcuts=Shortcut Settings:
+
+chinesesimplified.GroupSystem=系统深度集成:
+english.GroupSystem=System Integration:
+
+chinesesimplified.TaskContextMenu=在 Windows 资源管理器右键菜单添加「使用 EVE_IDT 快速查重此文件夹」
+english.TaskContextMenu=Add "Quick Deduplicate with EVE_IDT" to Windows Explorer context menu
+
+chinesesimplified.ContextMenuLabel=使用 EVE_IDT 快速查重此文件夹
+english.ContextMenuLabel=Quick Deduplicate with EVE_IDT
+
+chinesesimplified.TaskAutoStart=开机自动启动 EVE_IDT
+english.TaskAutoStart=Start EVE_IDT automatically on Windows startup
+
+chinesesimplified.UninstallShortcut=卸载 EVE_IDT
+english.UninstallShortcut=Uninstall EVE_IDT
+
+chinesesimplified.LaunchApp=立即运行 EVE_IDT (Eve_image_dedup_tool)
+english.LaunchApp=Launch EVE_IDT (Eve_image_dedup_tool)
+
+chinesesimplified.UninstallPrompt=是否同时清除 EVE_IDT 的本地回收暂存区 (staging_trash) 与特征缓存？%n%n• 点击「是」：彻底清除所有暂存图片与缓存文件；%n• 点击「否」：保留已删除暂存文件与白名单数据（推荐，方便日后重装使用）。
+english.UninstallPrompt=Do you also want to remove local staging trash (staging_trash) and feature caches?%n%n• Click [Yes]: Completely purge all trashed images and cache;%n• Click [No]: Keep staging files and whitelist data (Recommended for future reinstallation).
+
 [Tasks]
-Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "快捷方式设置:"; Flags: checkedonce
-Name: "contextmenu"; Description: "在 Windows 资源管理器右键菜单添加「使用 EVE_IDT 快速查重此文件夹」"; GroupDescription: "系统深度集成:"; Flags: checkedonce
-Name: "autostart"; Description: "开机自动启动 EVE_IDT"; GroupDescription: "系统深度集成:"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:TaskDesktopIcon}"; GroupDescription: "{cm:GroupShortcuts}"; Flags: checkedonce
+Name: "contextmenu"; Description: "{cm:TaskContextMenu}"; GroupDescription: "{cm:GroupSystem}"; Flags: checkedonce
+Name: "autostart"; Description: "{cm:TaskAutoStart}"; GroupDescription: "{cm:GroupSystem}"; Flags: unchecked
 
 [Files]
 Source: "dist_portable\EVE_IDT\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -68,17 +97,17 @@ Source: "app_icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Comment: "{#MyAppDescription}"
-Name: "{autoprograms}\{#MyAppName}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
+Name: "{autoprograms}\{#MyAppName}\{cm:UninstallShortcut}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; Comment: "{#MyAppDescription}"
 
 [Registry]
 ; 1. 文件夹右键菜单关联 (选中文件夹右键)
-Root: HKA; Subkey: "Software\Classes\Directory\shell\EVE_IDT"; ValueType: string; ValueName: ""; ValueData: "使用 EVE_IDT 快速查重此文件夹"; Flags: uninsdeletekey; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\Directory\shell\EVE_IDT"; ValueType: string; ValueName: ""; ValueData: "{cm:ContextMenuLabel}"; Flags: uninsdeletekey; Tasks: contextmenu
 Root: HKA; Subkey: "Software\Classes\Directory\shell\EVE_IDT"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\{#MyAppExeName}"",0"; Flags: uninsdeletekey; Tasks: contextmenu
 Root: HKA; Subkey: "Software\Classes\Directory\shell\EVE_IDT\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey; Tasks: contextmenu
 
 ; 2. 文件夹内部空白处右键菜单关联 (当前目录空白处右键)
-Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\EVE_IDT"; ValueType: string; ValueName: ""; ValueData: "使用 EVE_IDT 快速查重此文件夹"; Flags: uninsdeletekey; Tasks: contextmenu
+Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\EVE_IDT"; ValueType: string; ValueName: ""; ValueData: "{cm:ContextMenuLabel}"; Flags: uninsdeletekey; Tasks: contextmenu
 Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\EVE_IDT"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\{#MyAppExeName}"",0"; Flags: uninsdeletekey; Tasks: contextmenu
 Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\EVE_IDT\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%V"""; Flags: uninsdeletekey; Tasks: contextmenu
 
@@ -86,10 +115,10 @@ Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\EVE_IDT\command"
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "EVE_IDT"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "立即运行 {#MyAppName} ({#MyAppDescription})"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-// 卸载完成时友好询问用户是否保留或清理用户数据
+// 卸载完成时根据用户选择语言友好询问用户是否保留或清理用户数据
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   DataPrompt: Integer;
@@ -98,9 +127,7 @@ begin
   if CurUninstallStep = usPostUninstall then
   begin
     DataPrompt := MsgBox(
-      '是否同时清除 EVE_IDT 的本地回收暂存区 (staging_trash) 与特征缓存？' + #13#10 + #13#10 +
-      '• 点击「是」：彻底清除所有暂存图片与缓存文件；' + #13#10 +
-      '• 点击「否」：保留已删除暂存文件与白名单数据（推荐，方便日后重装使用）。',
+      CustomMessage('UninstallPrompt'),
       mbConfirmation, MB_YESNO or MB_DEFBUTTON2
     );
     if DataPrompt = IDYES then
