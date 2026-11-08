@@ -1239,11 +1239,35 @@ class UpdateCheckWorker(QThread):
                 pass
 
             remote_ver = str(manifest.get("version", APP_VERSION))
-            has_new = parse_semver(remote_ver) > parse_semver(APP_VERSION)
+            remote_sha256 = str(manifest.get("hotpatch_sha256", "")).strip().lower()
+            is_silent = bool(manifest.get("silent", False))
+
+            # 读取本地当前已安装热补丁的 sha256 指纹
+            local_installed_sha256 = ""
+            if os.path.isfile(self.paths.hotpatch_manifest_path):
+                try:
+                    with open(self.paths.hotpatch_manifest_path, "r", encoding="utf-8") as mf:
+                        local_installed_sha256 = str(json.load(mf).get("sha256", "")).strip().lower()
+                except Exception:
+                    pass
+
+            # 双轨更新判断：
+            # 1. 显式亮更新：远程版本号严格大于内置版本号
+            # 2. 静默暗更新：版本号相同或更高，但远程代码哈希与本地已安装指纹不同
+            has_ver_bump = parse_semver(remote_ver) > parse_semver(APP_VERSION)
+            has_hash_diff = bool(remote_sha256 and remote_sha256 != local_installed_sha256)
+            has_new = has_ver_bump or (has_hash_diff and parse_semver(remote_ver) >= parse_semver(APP_VERSION))
+
             manifest["_used_mirror"] = used_mirror
             manifest["_github_repo"] = self.github_repo
             manifest["_branch"] = self.branch
-            msg = f"发现新版本 v{remote_ver} (节点: {used_mirror})" if has_new else f"当前版本 v{APP_VERSION} 已是最新 ({used_mirror})"
+            if has_new:
+                if is_silent:
+                    msg = f"检测到静默热补丁 (指纹: {remote_sha256[:8]}, 节点: {used_mirror})"
+                else:
+                    msg = f"发现新版本 v{remote_ver} (节点: {used_mirror})"
+            else:
+                msg = f"当前版本 v{APP_VERSION} 已是最新 ({used_mirror})"
             self.updateCheckFinished.emit(has_new, manifest, msg)
         except Exception as e:
             self.updateCheckFinished.emit(False, {}, f"检查更新失败: {e}")
@@ -1270,6 +1294,8 @@ class UpdateDownloadWorker(QThread):
         hotpatch_files: Optional[Dict[str, str]] = None,
         github_repo: str = "",
         branch: str = "main",
+        is_silent: bool = False,
+        revision: str = "",
     ):
         super().__init__()
         self.download_urls = [u for u in download_urls if u]
@@ -1282,6 +1308,8 @@ class UpdateDownloadWorker(QThread):
         self.hotpatch_files = hotpatch_files or {}
         self.github_repo = github_repo
         self.branch = branch or "main"
+        self.is_silent = is_silent
+        self.revision = revision
 
     def _run_pure_source_hotpatch(self):
         """无二进制归档模式：直接按清单拉取纯文本 .py/.json 文件并逐一校验 SHA-256 与整体 RSA-2048 签名"""
@@ -1353,6 +1381,8 @@ class UpdateDownloadWorker(QThread):
 
             hp_manifest = {
                 "version": self.remote_version,
+                "silent": self.is_silent,
+                "revision": self.revision,
                 "sha256": combined_sha256,
                 "rsa_sig": self.expected_rsa_sig,
                 "applied_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

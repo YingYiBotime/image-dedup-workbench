@@ -1,15 +1,17 @@
 {
   "version": "4.1.4",
-  "published_at": "2026-11-08 17:09:28",
+  "silent": true,
+  "revision": "20261108172122",
+  "published_at": "2026-11-08 17:21:22",
   "hotpatch_files": {
-    "app.py": "aa1274457afbe6f58369035adbf80b45807ee822f67f9a64336da54891bb9f1e",
+    "app.py": "73030801d9b0424a97bb4c1f985a2b1f13ba5bb45b4a5cd21c5211f67e4ae3ba",
     "engine.py": "5e22fc6e8b1d96927f93c6de82b937158cf0a4c2a5464eafbd4ba976ac341ede",
-    "core_infra.py": "3b51c20c2bed5ae2af7d77cbd1a6e068d0df46ec7fb56ae598ef48854f3d69e9",
+    "core_infra.py": "5ce4a995c2af123f1bf1a1bf4f53f3b2020cf502312374b28b8f399751e78f96",
     "generate_icon.py": "bb64c9ce2ed9fffd5bc52f8bf64ccdd7dd8f0496ee0dfd42d64ace787edbf9db",
     "github_ota_config.json": "1dd58c6aae5ebb6933471858809869312d77d4d064f7f428820f5ea1410b2dab"
   },
-  "hotpatch_size_kb": 392.6,
-  "hotpatch_sha256": "222c3c959219ed47bb45d7e6c923c14f0fb0627ac5a6c3b0f2706e75cd28175c",
-  "hotpatch_rsa_sig": "bvhTXJ5MstveKZT7lIk8J-ZHPzYx5jCiYtN7q8gGXgi4s6ykE_TMujT5Id6nOU6GrePfjnApQnmcPBnhXBdjJtxZLyvwPBIXGWWrcyxE0wOn-J7veevhz69QxRj8jFOAYzcQnUlultI5XGsD2UQ8nHCFKYdbyVoKK3IpyCbaMWjiY7NcO4hY6YJ0lLjAFI4rrXikyZhUSuVugWWe7WKRvuP-Eh0Zx7hgbTewuKB6_P3U-y0bGJsa9QzrShCwQhAToGCdt0ikMdzJRhq09689v64Kfzn3hMOUSQ2Go3mxzq72Di3mRTOqp3pVDMhc99AaOS0GLylPqLVZ80qjWz2cVQ",
-  "notes": "修复应用更名为 EVE_IDT 后历史暂存区(staging_trash)与特征缓存的无感平滑迁移，增强撤销删除双路径兼容保障"
+  "hotpatch_size_kb": 396.1,
+  "hotpatch_sha256": "6df62ec08cb35d1073e61f268ba84e6babbb4618714689c20ba851bf38a4ed7a",
+  "hotpatch_rsa_sig": "LsRzo96wMF27wGE-GokXIXXPxT4xq85ivRO0IPinCPu5JJaOwNJx2uhmvJ7TiK1_ryaqXxipGprLpRsAWlPhDQQ39w5FD8QFjKsHPAee7BBjBcRgvB1JO5L11JVJ2319zK6Gjh3ouBJQ-vToEI-SzP8yzyN1LamqAPVb6BQqAMmJDERAWUdh90S2y-9F31-YLFMOyJLu7nCR-YRZbK7P4Dk45Yyr-aPFK2Bgus3Xl_eaTIgREAT_6hcZW5aVgwBeBNKArzBP7PUcP2H6PMRZggT74bxJB8ywgBuVMZLeY936VF3dzsgDGiqbpTYHNAIX4HTNtmkhGTz0ADp0sgRhoA",
+  "notes": "静默暗更新：历史已删暂存区(staging_trash)与缓存数据平滑迁移与撤销兼容优化"
 }

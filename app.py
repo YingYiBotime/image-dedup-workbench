@@ -81,8 +81,15 @@ def _bootstrap_hotpatch():
         with open(hp_manifest, "r", encoding="utf-8") as f:
             meta = json.load(f)
         hp_ver = str(meta.get("version", "")).strip()
-        if _parse_ver_tuple(hp_ver) <= _parse_ver_tuple(builtin_version):
+        is_silent = bool(meta.get("silent", False))
+        has_hash = bool(meta.get("sha256", ""))
+        # 1. 若热更补丁版本号严格小于当前内置版本，忽略旧补丁
+        if _parse_ver_tuple(hp_ver) < _parse_ver_tuple(builtin_version):
             return
+        # 2. 若版本号相同，仅当为静默暗补丁或存在校验指纹时接管运行
+        if _parse_ver_tuple(hp_ver) == _parse_ver_tuple(builtin_version):
+            if not is_silent and not has_hash:
+                return
 
         sys._tdpro_hotpatch_bootstrapped = True
         os.environ["TDPRO_ACTIVE_VERSION"] = hp_ver
@@ -4567,6 +4574,7 @@ class DedupMainWindow(QMainWindow):
 
         # 启动后 1.5 秒自动在后台检测是否有新版本可用
         self._ota_check_worker: Optional[UpdateCheckWorker] = None
+        self._silent_dl_worker: Optional[UpdateDownloadWorker] = None
         QTimer.singleShot(1500, self._start_silent_ota_check)
 
     def _start_silent_ota_check(self):
@@ -4580,10 +4588,42 @@ class DedupMainWindow(QMainWindow):
     def _on_silent_ota_check_done(self, has_new: bool, manifest: dict, msg: str):
         if not has_new:
             return
+        is_silent = bool(manifest.get("silent", False))
         remote_v = str(manifest.get("version", ""))
-        self.logger.info(f"New OTA version detected on startup: v{remote_v} ({msg})")
-        dlg = AutoUpdateDialog(self.paths, self.logger, self, preloaded_manifest=manifest)
-        dlg.exec()
+
+        if is_silent:
+            # 静默暗更新模式：零弹窗无打扰，后台自动静默拉取纯源码补丁，下次启动自动生效
+            self.logger.info(f"Silent hotpatch detected: {msg}, staging quietly in background...")
+            repo = manifest.get("_github_repo", "")
+            branch = manifest.get("_branch", "main")
+            hp_files = manifest.get("hotpatch_files") or {}
+            self._silent_dl_worker = UpdateDownloadWorker(
+                download_urls=[],
+                target_path="",
+                expected_sha256=manifest.get("hotpatch_sha256", ""),
+                expected_rsa_sig=manifest.get("hotpatch_rsa_sig", ""),
+                is_hotpatch=True,
+                remote_version=remote_v,
+                hotpatch_dir=self.paths.hotpatch_dir,
+                hotpatch_files=hp_files if isinstance(hp_files, dict) else {},
+                github_repo=repo,
+                branch=branch,
+                is_silent=True,
+                revision=str(manifest.get("revision", "")),
+            )
+            self._silent_dl_worker.downloadFinished.connect(self._on_silent_download_finished)
+            self._silent_dl_worker.start()
+        else:
+            # 常规亮更新模式：弹出更新确认对话框供用户主动确认
+            self.logger.info(f"Feature update detected on startup: v{remote_v} ({msg})")
+            dlg = AutoUpdateDialog(self.paths, self.logger, self, preloaded_manifest=manifest)
+            dlg.exec()
+
+    def _on_silent_download_finished(self, ok: bool, local_path: str, message: str, is_hotpatch: bool):
+        if ok:
+            self.logger.info(f"Silent hotpatch staged successfully in background: {local_path} ({message})")
+        else:
+            self.logger.warning(f"Failed to stage silent hotpatch: {message}")
 
     def _icon_btn_css(self) -> str:
         is_light = getattr(self, "_current_theme", "dark") == "light"

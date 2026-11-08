@@ -113,7 +113,7 @@ def sync_source_version(new_version: str):
                 f.write(txt_new)
 
 
-def build_signed_hotpatch(new_version: str, notes: str, repo: str, branch: str = DEFAULT_GITHUB_BRANCH) -> dict:
+def build_signed_hotpatch(new_version: str, notes: str, repo: str, branch: str = DEFAULT_GITHUB_BRANCH, is_silent: bool = False) -> dict:
     """生成纯文本源码增量更新清单 version.json（统一 LF 换行符，确保本地与 GitHub Raw 字节 100% 一致）"""
     sync_source_version(new_version)
     hotpatch_files = {}
@@ -137,6 +137,8 @@ def build_signed_hotpatch(new_version: str, notes: str, repo: str, branch: str =
 
     manifest = {
         "version": new_version,
+        "silent": is_silent,
+        "revision": datetime.now().strftime("%Y%m%d%H%M%S"),
         "published_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "hotpatch_files": hotpatch_files,
         "hotpatch_size_kb": round(total_bytes / 1024.0, 1),
@@ -184,14 +186,16 @@ def main():
     parser = argparse.ArgumentParser(description="一键生成并发布 GitHub 纯源码签名热更新")
     parser.add_argument("--repo", default="", help="GitHub 仓库 (例如 username/image-dedup-workbench)")
     parser.add_argument("--branch", default="", help="分支名 (默认 main)")
-    parser.add_argument("--version", default="", help="新版本号 (留空则自动递增末位版本号)")
+    parser.add_argument("--version", default="", help="新版本号 (留空则自动递增末位版本号，静默更新默认保持原版本号)")
     parser.add_argument("--notes", default="", help="本次更新说明")
+    parser.add_argument("--silent", "-s", action="store_true", help="【静默暗更新模式】：不跳动对外版本号，客户端后台静默拉取安装，零弹窗打扰")
     parser.add_argument("--no-push", action="store_true", help="仅生成签名版本清单，不执行 git push")
     args = parser.parse_args()
 
     cfg = load_current_config()
     repo = args.repo.strip() or cfg.get("github_repo", DEFAULT_GITHUB_REPO).strip() or DEFAULT_GITHUB_REPO
     branch = args.branch.strip() or cfg.get("branch", DEFAULT_GITHUB_BRANCH).strip() or DEFAULT_GITHUB_BRANCH
+    is_silent = bool(args.silent)
 
     print("=" * 74)
     print("  EVE_IDT - GitHub 云端秒级热更新 (OTA) 发布中心")
@@ -199,6 +203,7 @@ def main():
 
     save_config_everywhere(repo, branch)
     print(f"[OK] 已绑定 GitHub 更新源仓库: {AppPaths.normalize_github_repo(repo) or '(待绑定)'} (分支: {branch})")
+    print(f"[OK] 发布模式             : {'【静默暗更新 (Silent Hotfix)】' if is_silent else '【常规亮更新 (Feature Release)】'}")
 
     prev_ver = "4.0.0"
     if os.path.isfile(VERSION_JSON_FILE):
@@ -208,27 +213,32 @@ def main():
         except Exception:
             pass
 
-    default_next_ver = bump_patch_version(prev_ver)
+    # 静默更新默认保持原版本号，常规亮更新默认递增版本号
+    default_next_ver = prev_ver if is_silent else bump_patch_version(prev_ver)
     new_ver = args.version.strip()
     if not new_ver and sys.stdin.isatty() and not args.no_push:
-        v_in = input(f"请输入新版本号 [直接回车默认 {default_next_ver}] > ").strip()
+        prompt_txt = f"请输入版本号 [静默模式直接回车保持 {default_next_ver}] > " if is_silent else f"请输入新版本号 [直接回车默认 {default_next_ver}] > "
+        v_in = input(prompt_txt).strip()
         new_ver = v_in or default_next_ver
     elif not new_ver:
         new_ver = default_next_ver
 
     notes = args.notes.strip()
-    default_notes = (
-        f"1. 升级为标准商业软件更新体验：检测到新版本时弹窗询问是否更新，点击【立即更新】后在电脑上全自动完成升级并重启；\n"
-        f"2. 内置【使用指南与常见问题帮助中心 (F1)】，详解白名单功能与已删图片暂存区找回方法；\n"
-        f"3. 默认仅扫描当前顶层文件夹，支持可选【包含子文件夹】开关。"
-    )
-    if not notes and sys.stdin.isatty() and not args.no_push:
-        n_in = input("请输入本次更新说明 [直接回车使用默认说明] > ").strip()
-        notes = n_in or default_notes
+    if is_silent and not notes:
+        notes = "静默暗更新：底层稳定性与历史暂存区数据安全迁移优化"
     elif not notes:
-        notes = default_notes
+        default_notes = (
+            f"1. 升级为标准商业软件更新体验：检测到新版本时弹窗询问是否更新，点击【立即更新】后在电脑上全自动完成升级并重启；\n"
+            f"2. 内置【使用指南与常见问题帮助中心 (F1)】，详解白名单功能与已删图片暂存区找回方法；\n"
+            f"3. 默认仅扫描当前顶层文件夹，支持可选【包含子文件夹】开关。"
+        )
+        if sys.stdin.isatty() and not args.no_push:
+            n_in = input("请输入本次更新说明 [直接回车使用默认说明] > ").strip()
+            notes = n_in or default_notes
+        else:
+            notes = default_notes
 
-    manifest = build_signed_hotpatch(new_ver, notes, repo, branch)
+    manifest = build_signed_hotpatch(new_ver, notes, repo, branch, is_silent=is_silent)
     print("-" * 74)
     print(f"[OK] 纯源码热更清单已生成 : {VERSION_JSON_FILE} (v{manifest['version']} · 共 {len(manifest['hotpatch_files'])} 个源码文件)")
     print(f"[OK] SHA-256 完整性指纹   : {manifest['hotpatch_sha256']}")
@@ -238,8 +248,12 @@ def main():
     if not args.no_push and repo:
         ok = push_to_github(repo, branch, new_ver)
         if ok:
-            print(f"\n[SUCCESS] v{new_ver} 已推送至 GitHub ({repo} 分支 {branch})！")
-            print("所有用户打开软件将自动弹出更新提示并在电脑上完成升级！")
+            if is_silent:
+                print(f"\n[SUCCESS] 静默暗更新 (v{new_ver}) 已推送至 GitHub ({repo} 分支 {branch})！")
+                print("所有用户客户端打开软件将在后台无声静默下载落盘，下次启动自动接管，完全不弹窗打扰！")
+            else:
+                print(f"\n[SUCCESS] v{new_ver} 已推送至 GitHub ({repo} 分支 {branch})！")
+                print("所有用户打开软件将自动弹出更新提示并在电脑上完成升级！")
         else:
             print(
                 f"\n[提示] 本地签名清单已就绪。请确认本机 Git 已登录新 GitHub 账号，"
