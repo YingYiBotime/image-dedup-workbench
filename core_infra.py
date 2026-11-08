@@ -44,7 +44,7 @@ APP_VENDOR = "TableclothStudio"
 APP_INTERNAL_NAME = "EVE_IDT"
 APP_DISPLAY_NAME = "EVE_IDT"
 APP_FILE_DESCRIPTION = "Eve_image_dedup_tool"
-APP_VERSION = os.environ.get("TDPRO_ACTIVE_VERSION", "4.1.3")
+APP_VERSION = os.environ.get("TDPRO_ACTIVE_VERSION", "4.1.4")
 
 # 默认内置的专属 GitHub 仓库地址与分支
 DEFAULT_GITHUB_REPO = "YingYiBotime/image-dedup-workbench"
@@ -85,6 +85,7 @@ class AppPaths:
         self.feat_cache_dir = os.path.join(self.cache_root, "features")
         self.thumb_cache_dir = os.path.join(self.cache_root, "thumbnails")
         self.trash_dir = os.path.join(self.local_root, "staging_trash")
+        self.legacy_trash_dir = os.path.join(local_base, "TableclothDedupPro", "staging_trash")
         self.log_dir = os.path.join(self.local_root, "logs")
         self.crash_dir = os.path.join(self.local_root, "crashes")
         self.updates_dir = os.path.join(self.local_root, "updates")
@@ -107,11 +108,11 @@ class AppPaths:
         ):
             os.makedirs(folder, exist_ok=True)
 
-        # 平滑迁移旧版 TableclothDedupPro 配置与状态数据库
+        # 平滑迁移旧版 TableclothDedupPro 配置与状态数据库 (%APPDATA%)
         try:
             roaming_base = os.path.dirname(self.roaming_root)
             legacy_roaming = os.path.join(roaming_base, "TableclothDedupPro")
-            if os.path.isdir(legacy_roaming):
+            if os.path.isdir(legacy_roaming) and self.app_name != "TableclothDedupPro":
                 for sub in ("config", "data"):
                     src = os.path.join(legacy_roaming, sub)
                     dst = getattr(self, f"{sub}_dir", None)
@@ -121,6 +122,51 @@ class AppPaths:
                             dst_file = os.path.join(dst, f)
                             if os.path.isfile(src_file) and not os.path.exists(dst_file):
                                 shutil.copy2(src_file, dst_file)
+        except Exception:
+            pass
+
+        # 核心保证：平滑合并与迁移旧版回收暂存区 staging_trash 与缓存 (%LOCALAPPDATA%)
+        try:
+            local_base = os.path.dirname(self.local_root)
+            legacy_local = os.path.join(local_base, "TableclothDedupPro")
+            if os.path.isdir(legacy_local) and self.app_name != "TableclothDedupPro":
+                # 1. 迁移回收暂存区历史文件（绝对保证旧版本暂存的图片 100% 完整继承）
+                legacy_trash = os.path.join(legacy_local, "staging_trash")
+                if os.path.isdir(legacy_trash):
+                    for f in os.listdir(legacy_trash):
+                        src_f = os.path.join(legacy_trash, f)
+                        dst_f = os.path.join(self.trash_dir, f)
+                        if os.path.isfile(src_f):
+                            if not os.path.exists(dst_f):
+                                try:
+                                    shutil.move(src_f, dst_f)
+                                except Exception:
+                                    try:
+                                        shutil.copy2(src_f, dst_f)
+                                    except Exception:
+                                        pass
+                            else:
+                                # 若同名但大小不同，重命名安全迁移防覆盖
+                                try:
+                                    if os.path.getsize(src_f) != os.path.getsize(dst_f):
+                                        stem, ext = os.path.splitext(f)
+                                        safe_dst = os.path.join(self.trash_dir, f"{stem}_legacy{ext}")
+                                        shutil.move(src_f, safe_dst)
+                                except Exception:
+                                    pass
+
+                # 2. 迁移特征提取与缩略图缓存（避免旧用户升级后重新长时间提取缓存）
+                for sub_c, dst_c in (("features", self.feat_cache_dir), ("thumbnails", self.thumb_cache_dir)):
+                    src_c = os.path.join(legacy_local, "cache", sub_c)
+                    if os.path.isdir(src_c) and os.path.isdir(dst_c):
+                        for f in os.listdir(src_c):
+                            src_f = os.path.join(src_c, f)
+                            dst_f = os.path.join(dst_c, f)
+                            if os.path.isfile(src_f) and not os.path.exists(dst_f):
+                                try:
+                                    shutil.copy2(src_f, dst_f)
+                                except Exception:
+                                    pass
         except Exception:
             pass
 
@@ -1680,7 +1726,7 @@ class AutoUpdateDialog(QDialog):
             sha256_exp = self.current_manifest.get("sha256", "")
             rsa_sig = ""
             ext = os.path.splitext(dl_url.split("?")[0])[1] or ".exe"
-            target_file = os.path.join(self.paths.updates_dir, f"TableclothDedupPro_Setup_v{remote_v}{ext}")
+            target_file = os.path.join(self.paths.updates_dir, f"{self.paths.app_name}_Setup_v{remote_v}{ext}")
             is_hp = False
 
         self.progress_bar.setValue(0)

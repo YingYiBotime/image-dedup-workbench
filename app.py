@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-EVE_IDT v4.1.3 — Studio Mode (app.py)
+EVE_IDT v4.1.4 — Studio Mode (app.py)
 文件说明: Eve_image_dedup_tool
 严格遵循工业级现代中性暗色/明亮规范与双阶段状态解耦架构 (Phase-Based Layout)：
 - 沉浸式标题栏：自适应无边框标题栏 (高度 38px)，消除 Windows 原生生硬白条，内嵌 EVE_IDT 品牌标识与版本
@@ -62,7 +62,7 @@ def _bootstrap_hotpatch():
     """启动时检查 %LOCALAPPDATA%\\EVE_IDT\\hotpatch 下是否有更新的云端热补丁并无缝接管"""
     if getattr(sys, "_tdpro_hotpatch_bootstrapped", False):
         return
-    builtin_version = "4.1.3"
+    builtin_version = "4.1.4"
     local_base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~\\AppData\\Local")
     hp_candidates = [
         os.path.join(local_base, "EVE_IDT", "hotpatch"),
@@ -4675,7 +4675,7 @@ class DedupMainWindow(QMainWindow):
         menu.addSeparator()
 
         act_open_trash = QAction("打开已删除图片回收暂存区 (staging_trash)...", self)
-        act_open_trash.triggered.connect(lambda: os.startfile(self.paths.trash_dir))
+        act_open_trash.triggered.connect(self._open_trash_dir)
         menu.addAction(act_open_trash)
 
         act_open_logs = QAction("打开运行日志与缓存目录 (%LOCALAPPDATA%)...", self)
@@ -6079,6 +6079,33 @@ class DedupMainWindow(QMainWindow):
                 (16, 185, 129)
             )
 
+    def _open_trash_dir(self):
+        """安全打开回收暂存区文件夹，并在打开前智能平滑迁移旧版本遗留的暂存图片"""
+        try:
+            os.makedirs(self.paths.trash_dir, exist_ok=True)
+            local_base = os.path.dirname(self.paths.local_root)
+            legacy_trash = os.path.join(local_base, "TableclothDedupPro", "staging_trash")
+            if os.path.isdir(legacy_trash):
+                migrated_cnt = 0
+                for f in os.listdir(legacy_trash):
+                    src_f = os.path.join(legacy_trash, f)
+                    dst_f = os.path.join(self.paths.trash_dir, f)
+                    if os.path.isfile(src_f) and not os.path.exists(dst_f):
+                        try:
+                            shutil.move(src_f, dst_f)
+                            migrated_cnt += 1
+                        except Exception:
+                            pass
+                if migrated_cnt > 0:
+                    self.logger.info(f"Dynamically migrated {migrated_cnt} trash files from legacy directory.")
+        except Exception as e:
+            self.logger.warning(f"Failed to scan legacy trash dir: {e}")
+
+        try:
+            os.startfile(self.paths.trash_dir)
+        except Exception as e:
+            QMessageBox.warning(self, "打开暂存区失败", f"无法打开暂存区目录：{e}\n路径：{self.paths.trash_dir}")
+
     def _show_about_dialog(self):
         hw_code = MachineFingerprint.get_machine_code()
         dlg = QDialog(self)
@@ -6183,7 +6210,7 @@ class DedupMainWindow(QMainWindow):
         btn_open_trash.setFixedHeight(34)
         btn_open_trash.setCursor(Qt.PointingHandCursor)
         btn_open_trash.setStyleSheet(self._secondary_pill_css())
-        btn_open_trash.clicked.connect(lambda: os.startfile(self.paths.trash_dir))
+        btn_open_trash.clicked.connect(self._open_trash_dir)
         btn_row.addWidget(btn_open_trash)
 
         btn_clear_wl = QPushButton(" 清空白名单与特征缓存")

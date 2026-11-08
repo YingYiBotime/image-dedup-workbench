@@ -320,10 +320,22 @@ class DedupEngine:
         record = self.undo_stack.pop()
         restored_count = 0
         for item, backup_path in record.restored_items:
-            if os.path.exists(backup_path):
+            actual_backup_path = backup_path
+            if not os.path.exists(actual_backup_path):
+                # 双重路径容错：检查当前新暂存区与历史版本暂存区
+                fn = os.path.basename(backup_path)
+                cand_new = os.path.join(self.trash_dir, fn)
+                legacy_trash = getattr(self.paths, "legacy_trash_dir", os.path.join(os.path.dirname(self.paths.local_root), "TableclothDedupPro", "staging_trash"))
+                cand_old = os.path.join(legacy_trash, fn)
+                if os.path.exists(cand_new):
+                    actual_backup_path = cand_new
+                elif os.path.exists(cand_old):
+                    actual_backup_path = cand_old
+
+            if os.path.exists(actual_backup_path):
                 try:
                     os.makedirs(os.path.dirname(item.filepath), exist_ok=True)
-                    shutil.move(backup_path, item.filepath)
+                    shutil.move(actual_backup_path, item.filepath)
                     item.deleted = False
                     restored_count += 1
                 except Exception as e:
