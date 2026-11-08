@@ -1,17 +1,18 @@
 {
   "version": "4.1.4",
   "silent": true,
-  "revision": "20261108173517",
-  "published_at": "2026-11-08 17:35:17",
+  "revision": "20261108182447",
+  "published_at": "2026-11-08 18:24:47",
   "hotpatch_files": {
-    "app.py": "0dabf1879cdd4fe29b3cea880045787ea6c8e0da4818fff1dc85417812d72f8f",
+    "app.py": "024156904ddf9206b55ebcb648342fefa2aacdb22256f1c889c26ea2133aaf28",
     "engine.py": "5e22fc6e8b1d96927f93c6de82b937158cf0a4c2a5464eafbd4ba976ac341ede",
     "core_infra.py": "5ce4a995c2af123f1bf1a1bf4f53f3b2020cf502312374b28b8f399751e78f96",
     "generate_icon.py": "bb64c9ce2ed9fffd5bc52f8bf64ccdd7dd8f0496ee0dfd42d64ace787edbf9db",
+    "i18n.py": "07c4e97263abeb770e51bb71cd8017414a3970e979b37ded98d3aa7bb90c172f",
     "github_ota_config.json": "1dd58c6aae5ebb6933471858809869312d77d4d064f7f428820f5ea1410b2dab"
   },
-  "hotpatch_size_kb": 396.9,
-  "hotpatch_sha256": "085dac59cdf12b518c1a5bd136d4923918d556061753d233c20708486e4f2e2d",
-  "hotpatch_rsa_sig": "WUcHcnc7w-oIZbhY3KWVAFvUj-rWzRKw5_gYz2cpcePFHKPX62FTMPMg1QUYtj9dPnIodLZw83fHKA8MoOJwOiXOL_P1cCPmc2evmdgbaOBPyfEnzLD_BOwRoz1NzaIG2yPl92r5pKIDBOLeP3TZ_lxB7B2rowG9raXpc7mj-dip3S_QZ-qj2bzKAp1AUXNhQSLPkHvoicmER83vliXcKuWgxWacFj_J6kj3-OUBqL3oTu-1UW-7nSSNLg4viYckx9RXcYTIPtZsTEJZdxFCXvr0tn7-rtctY1USIsoj6DlcoyMi0lz9QxbX3WmUMeIh89b1_ACBsh1FD1E7QXQpIQ",
-  "notes": "企业级升级：支持命令行参数与 Windows 资源管理器右键快速查重"
+  "hotpatch_size_kb": 431.5,
+  "hotpatch_sha256": "cecd6c4b16c0be26e495567aa0ee9a99131fab018c98560c7f164262604048d5",
+  "hotpatch_rsa_sig": "HIshFlU8o0GaH_C6mh6qbiVDB6WTQFuNw1LYVo-k7wZDg5s4ozM_HdhVKyT3oKfg52z7AcNI_B5wqNn30f3hGcJYiMwHaHh1f7lA7IiCV3p2pI95LDn95V08Czqhmg6UWkugWyHHEtc0DbTaEkuSxtmEuIwsr6y5xgNaEwwMH9yvGf0oxKHoX6dcWlYFppihh7rHWfTP_G0-qJu8sPRdQrhLBKTE0GDSKyUZcH5X5tJ_Wg7lVQv1IN550xPjtQa_yOKVqQEZM6cJ2Q_SvgHgUYD1WEaU_pf08eBJIXnZoxDacD3MTXiHNCA0V5aXDfKukMtng6lY2o9R4tUkAt2uFA",
+  "notes": "全功能支持中英双语国际化切换 (i18n)"
 }

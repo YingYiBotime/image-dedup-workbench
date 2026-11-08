@@ -45,7 +45,7 @@ def _parse_ver_tuple(v: str) -> Tuple[int, ...]:
 
 class _HotPatchMetaFinder(importlib.abc.MetaPathFinder):
     """优先于 PyInstaller FrozenImporter 拦截并加载本地热更新目录下的核心模块"""
-    PATCHABLE_MODULES = {"core_infra", "engine", "generate_icon"}
+    PATCHABLE_MODULES = {"core_infra", "engine", "generate_icon", "i18n"}
 
     def __init__(self, hotpatch_dir: str):
         self.hotpatch_dir = hotpatch_dir
@@ -162,6 +162,7 @@ from core_infra import (
     UpdateCheckWorker, UpdateDownloadWorker, build_github_ota_urls, restart_application
 )
 from generate_icon import render_studio_icon_qimage
+from i18n import I18nManager, tr, get_current_lang, set_current_lang, toggle_lang, LANG_ZH, LANG_EN
 
 
 # ==================== 1. Lucide 风格线性矢量图标引擎 (零 Emoji) ====================
@@ -831,7 +832,13 @@ class EVETitleBar(QWidget):
         icon_name = "win-restore" if is_max else "win-maximize"
         icon_color = "#475569" if self._theme == "light" else "#a1a1aa"
         self.btn_max.setIcon(LucideIcon.icon(icon_name, 12, icon_color, 1.2))
-        self.btn_max.setToolTip("还原" if is_max else "最大化")
+        self.btn_max.setToolTip(tr("btn_restore") if is_max else tr("btn_maximize"))
+
+    def retranslate_ui(self):
+        is_max = self.main_window.isMaximized()
+        self.btn_min.setToolTip(tr("btn_minimize"))
+        self.btn_max.setToolTip(tr("btn_restore") if is_max else tr("btn_maximize"))
+        self.btn_close.setToolTip(tr("btn_close"))
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:
@@ -977,8 +984,8 @@ class SegmentedControl(QFrame):
         layout.setContentsMargins(3, 3, 3, 3)
         layout.setSpacing(2)
 
-        self.btn_single = QPushButton("单文件夹查重")
-        self.btn_cross = QPushButton("跨文件夹交叉比对")
+        self.btn_single = QPushButton(tr("mode_single"))
+        self.btn_cross = QPushButton(tr("mode_cross"))
         self._is_cross = False
         self._slide_progress = 0.0  # 0.0 = 单文件夹, 1.0 = 跨文件夹
         self._glow_progress = 0.0   # 切换瞬间的描边呼吸高光
@@ -1007,6 +1014,10 @@ class SegmentedControl(QFrame):
         self._theme = theme
         self._refresh_style()
         self.update()
+
+    def retranslate_ui(self):
+        self.btn_single.setText(tr("mode_single"))
+        self.btn_cross.setText(tr("mode_cross"))
 
     @property
     def is_cross(self) -> bool:
@@ -1156,6 +1167,11 @@ class CompactPathInput(QPushButton):
     def set_theme(self, theme: str):
         self.theme = theme
         self._update_appearance()
+
+    def setPlaceholderText(self, text: str):
+        self.placeholder = text
+        if not self._path:
+            self._update_appearance()
 
     @property
     def path(self) -> str:
@@ -1311,11 +1327,15 @@ class CompactPathInput(QPushButton):
 SENSITIVITY_SPECS = {
     "standard": {
         "short": "标准模式",
+        "short_en": "Standard",
         "badge": "均衡推荐",
+        "badge_en": "Balanced",
         "title": "标准模式（推荐）",
+        "title_en": "Standard (Recommended)",
         "accent": "#3b82f6",
         "accent_rgb": (59, 130, 246),
         "desc": "兼顾原图与局部变体：精准检出完全相同、尺寸缩放压缩，以及加水印/换字、局部微调或局部调色的相似图片。",
+        "desc_en": "Balanced for exact copies and variants: accurately detects identical images, rescaled/compressed versions, watermarks, text swaps, and local recoloring.",
         "detect_scope": "完全相同原图、不同分辨率缩放/有损压缩图、局部加水印或换字、边缘微调或局部调色的同源图片。",
         "ignore_scope": "构图完全不同的独立图片、仅背景色调相似但主体内容不同的图像。",
         "scene_logic": "综合多尺度空间直方图、边缘矩阵与 SIFT/RANSAC 几何内点校验，日常摄影图库、设计素材与电商图片去重首选。",
@@ -1323,11 +1343,15 @@ SENSITIVITY_SPECS = {
     },
     "strict": {
         "short": "严格模式",
+        "short_en": "Strict",
         "badge": "零误报 · 仅同图",
+        "badge_en": "Zero False Alarm",
         "title": "严格模式（仅限同图）",
+        "title_en": "Strict (Exact Match)",
         "accent": "#10b981",
         "accent_rgb": (16, 185, 129),
         "desc": "仅限高度一致原图：只检出画面几乎一模一样的原图、格式转换与缩放压缩图，自动忽略换字或改色变体，零误报。",
+        "desc_en": "Strict exact match: only flags near-identical images, format conversions, and scale compression; ignores modified variants.",
         "detect_scope": "二进制完全相同文件、仅做过尺寸放大缩小、格式转换（PNG/JPG/WebP）或轻度重压缩的同一张图片。",
         "ignore_scope": "修改过文字、局部改过颜色、增减了局部元素的同系列衍生变体图（均不报警）。",
         "scene_logic": "采用高阈值结构与严苛几何内点一致性过滤，适合快速清理纯重复备份图片，确保零误删。",
@@ -1335,11 +1359,15 @@ SENSITIVITY_SPECS = {
     },
     "deep": {
         "short": "深度宽松",
+        "short_en": "Loose",
         "badge": "广覆盖 · 含重绘",
+        "badge_en": "Wide Coverage",
         "title": "深度宽松（广覆盖）",
+        "title_en": "Loose (Wide Coverage)",
         "accent": "#f59e0b",
         "accent_rgb": (245, 158, 11),
         "desc": "捕获大幅调色与重绘：放宽特征匹配阈值，将大幅换底色、AI图生图重绘变体及近似构图图片一并检出供人工排查。",
+        "desc_en": "High tolerance: tolerates aggressive cropping, large aspect-ratio stretching, background replacement, and AI inpainting.",
         "detect_scope": "包含标准模式全部范围，并额外捕获：大幅更换背景/色调、AI 图生图重绘变体、同构图连拍或衍生图片。",
         "ignore_scope": "仅过滤视觉结构与局部几何特征均完全无关的图片。",
         "scene_logic": "放宽局部特征匹配与色彩直方图容差，适合清查“AI 图生图衍生图”、连拍选片或近似素材深度复核。",
@@ -1475,7 +1503,10 @@ class SensitivitySelector(QToolButton):
     def _update_button_label(self):
         spec = SENSITIVITY_SPECS[self._current_key]
         self.setIcon(LucideIcon.icon("sliders", 14, spec["accent"]))
-        self.setText(f" 灵敏度：{spec['short']} ▾")
+        is_en = I18nManager.get_instance().is_english()
+        prefix = "Sensitivity" if is_en else "灵敏度"
+        name = spec.get("short_en" if is_en else "short", spec["short"])
+        self.setText(f" {prefix}: {name} ▾")
         self.setToolTip(build_sensitivity_tooltip_html(self._current_key))
         self.update()
 
@@ -1745,11 +1776,24 @@ class SensitivityInteractiveBar(QFrame):
         if self._expanded == expanded:
             return
         self._expanded = expanded
-        self.btn_expand.setText("收起详情 ▴" if expanded else "展开详情 ▾")
+        is_en = I18nManager.get_instance().is_english()
+        self.btn_expand.setText(("Collapse ▴" if is_en else "收起详情 ▴") if expanded else ("Details ▾" if is_en else "展开详情 ▾"))
         self._expand_anim.stop()
         self._expand_anim.setStartValue(self._expand_progress)
         self._expand_anim.setEndValue(1.0 if expanded else 0.0)
         self._expand_anim.start()
+
+    def retranslate_ui(self):
+        is_en = I18nManager.get_instance().is_english()
+        self.lbl_prefix.setText("Sensitivity" if is_en else "灵敏度档位")
+        for k, btn in self._btns.items():
+            sp = SENSITIVITY_SPECS[k]
+            btn_txt = sp.get("short_en" if is_en else "short", sp["short"])
+            btn.setText(btn_txt)
+            btn.setToolTip(build_sensitivity_tooltip_html(k))
+        self.btn_expand.setText(("Collapse ▴" if is_en else "收起详情 ▴") if self._expanded else ("Details ▾" if is_en else "展开详情 ▾"))
+        self._refresh_button_styles()
+        self.update()
 
     def _on_expand_step(self, val):
         self._expand_progress = float(val)
@@ -2190,6 +2234,16 @@ class StudioDropCard(QFrame):
         self._pulse_anim.setEndValue(0.0)
         self._pulse_anim.start()
 
+    def update_i18n(self, title: str, subtitle: str, role_badge: Optional[str] = None):
+        self.default_title = title
+        self.default_subtitle = subtitle
+        if not self._path:
+            self.lbl_title.setText(title)
+            self.lbl_sub.setText(subtitle)
+        if role_badge is not None:
+            self.role_badge = role_badge
+            self.lbl_role_badge.setText(role_badge)
+
     def set_folder_path(self, path: str):
         self._path = os.path.normpath(path) if path else ""
         self._refresh_visuals(drag_hover=False)
@@ -2609,7 +2663,8 @@ class GroupDrawerItemWidget(QWidget):
         row_top.setContentsMargins(0, 0, 0, 0)
         row_top.setSpacing(6)
 
-        self.lbl_id = QLabel(f"第 {group.group_id:02d} 组")
+        is_en = I18nManager.get_instance().is_english()
+        self.lbl_id = QLabel(f"Group {group.group_id:02d}" if is_en else f"第 {group.group_id:02d} 组")
         self.lbl_id.setStyleSheet("color: #f4f4f5; font-size: 12px; font-weight: 600; background: transparent; border: none;")
         row_top.addWidget(self.lbl_id)
 
@@ -2645,9 +2700,15 @@ class GroupDrawerItemWidget(QWidget):
         )
         self.update_group_state()
 
+    def retranslate_ui(self):
+        is_en = I18nManager.get_instance().is_english()
+        self.lbl_id.setText(f"Group {self.group.group_id:02d}" if is_en else f"第 {self.group.group_id:02d} 组")
+        self.update_group_state()
+
     def update_group_state(self):
         """局部增量更新卡片状态与缩略图，0.05ms 极速响应，杜绝全列表销毁重建"""
         is_light = (getattr(self, "theme", "dark") == "light")
+        is_en = I18nManager.get_instance().is_english()
         active = self.group.active_items
         items_src = active if len(active) >= 2 else self.group.items
         p_a = items_src[0].filepath if len(items_src) >= 1 else ""
@@ -2655,16 +2716,22 @@ class GroupDrawerItemWidget(QWidget):
         self.lbl_thumb.setPixmap(make_dual_thumbnail_pixmap(p_a, p_b, 56, 32, is_light=is_light))
 
         if self.group.whitelisted:
-            tag_text = "白名单保留"
+            tag_text = "Whitelisted" if is_en else "白名单保留"
             tag_css = f"color: {'#2563eb' if is_light else '#60a5fa'}; font-size: 11px; background: transparent; border: none;"
         elif len(active) <= 1:
-            tag_text = "已决断"
+            tag_text = "Resolved" if is_en else "已决断"
             tag_css = f"color: {'#059669' if is_light else '#10b981'}; font-size: 11px; background: transparent; border: none;"
         else:
-            short_type = "完全相同" if "MD5" in self.group.match_type else (
-                "像素同款" if "像素" in self.group.match_type else "局部变体"
-            )
-            tag_text = f"{short_type} · {len(active)}张"
+            if is_en:
+                short_type = "Exact Match" if "MD5" in self.group.match_type else (
+                    "Identical" if "像素" in self.group.match_type else "Variant"
+                )
+                tag_text = f"{short_type} · {len(active)} imgs"
+            else:
+                short_type = "完全相同" if "MD5" in self.group.match_type else (
+                    "像素同款" if "像素" in self.group.match_type else "局部变体"
+                )
+                tag_text = f"{short_type} · {len(active)}张"
             tag_css = f"color: #71717a; font-size: 11px; background: transparent; border: none;"
 
         self.lbl_tag.setText(tag_text)
@@ -2983,7 +3050,11 @@ class ViewportUnit(QFrame):
         hdr.setSpacing(8)
 
         side_code = chr(ord("A") + self.index_in_group)
-        role_title = f"原始图 ({side_code})" if self.index_in_group == 0 else f"对比图 ({side_code})"
+        is_en = I18nManager.get_instance().is_english()
+        if is_en:
+            role_title = f"Original ({side_code})" if self.index_in_group == 0 else f"Comparison ({side_code})"
+        else:
+            role_title = f"原始图 ({side_code})" if self.index_in_group == 0 else f"对比图 ({side_code})"
         lbl_role = QLabel(role_title)
         lbl_role.setStyleSheet(f"color: {'#18181b' if is_light else '#e4e4e7'}; font-size: 12px; font-weight: 600; border: none;")
         hdr.addWidget(lbl_role)
@@ -3003,15 +3074,15 @@ class ViewportUnit(QFrame):
 
         # 多候选图切换胶囊按钮组
         if self.candidates and len(self.candidates) > 1:
-            lbl_cand_tip = QLabel("切换副本:")
+            lbl_cand_tip = QLabel("Switch Copy:" if is_en else "切换副本:")
             lbl_cand_tip.setStyleSheet("color: #71717a; font-size: 11px; margin-left: 2px; border: none;")
             hdr.addWidget(lbl_cand_tip)
             for c_idx, c_item in self.candidates:
                 c_code = chr(ord("A") + c_idx)
-                btn_c = QPushButton(f"图 {c_code}")
+                btn_c = QPushButton(f"Img {c_code}" if is_en else f"图 {c_code}")
                 btn_c.setFixedHeight(22)
                 btn_c.setCursor(Qt.PointingHandCursor)
-                btn_c.setToolTip(f"切换对比图 ({c_code}): {c_item.filename} [{c_item.folder_tag}]")
+                btn_c.setToolTip(f"Switch comparison ({c_code}): {c_item.filename} [{c_item.folder_tag}]" if is_en else f"切换对比图 ({c_code}): {c_item.filename} [{c_item.folder_tag}]")
                 if c_idx == self.current_candidate_idx:
                     btn_c.setStyleSheet("""
                         QPushButton {
@@ -3064,11 +3135,11 @@ class ViewportUnit(QFrame):
 
         # 平铺多图时允许一键聚焦与原图 1v1 对比
         if self.is_grid_mode and self.index_in_group > 0:
-            btn_focus = QPushButton(" 1v1对比")
+            btn_focus = QPushButton(" 1v1 Compare" if is_en else " 1v1对比")
             btn_focus.setIcon(LucideIcon.icon("columns", 13, "#52525b" if is_light else "#a1a1aa"))
             btn_focus.setFixedHeight(24)
             btn_focus.setCursor(Qt.PointingHandCursor)
-            btn_focus.setToolTip("与原图进入 1 对 1 左右大视口精细聚焦比对")
+            btn_focus.setToolTip("Enter 1-on-1 large viewport comparison with original" if is_en else "与原图进入 1 对 1 左右大视口精细聚焦比对")
             if is_light:
                 btn_focus.setStyleSheet("""
                     QPushButton {
@@ -3121,7 +3192,7 @@ class ViewportUnit(QFrame):
         btn_zoom.setIcon(LucideIcon.icon("maximize-2", 14, "#52525b" if is_light else "#a1a1aa"))
         btn_zoom.setFixedSize(24, 24)
         btn_zoom.setCursor(Qt.PointingHandCursor)
-        btn_zoom.setToolTip("全屏巨幅放大检视此图 (也可直接双击图片)")
+        btn_zoom.setToolTip("Fullscreen lightbox (or double-click image)" if is_en else "全屏巨幅放大检视此图 (也可直接双击图片)")
         btn_zoom.setStyleSheet(icon_btn_style)
         btn_zoom.clicked.connect(lambda: self.lightboxRequested.emit(self.item))
         hdr.addWidget(btn_zoom)
@@ -3130,7 +3201,7 @@ class ViewportUnit(QFrame):
         btn_loc.setIcon(LucideIcon.icon("folder", 14, "#71717a"))
         btn_loc.setFixedSize(24, 24)
         btn_loc.setCursor(Qt.PointingHandCursor)
-        btn_loc.setToolTip(f"在资源管理器中定位：{self.item.filepath}")
+        btn_loc.setToolTip(f"Locate in Explorer: {self.item.filepath}" if is_en else f"在资源管理器中定位：{self.item.filepath}")
         btn_loc.setStyleSheet(icon_btn_style)
         btn_loc.clicked.connect(lambda: self.locateRequested.emit(self.item))
         hdr.addWidget(btn_loc)
@@ -3150,7 +3221,8 @@ class ViewportUnit(QFrame):
             p = QPainter(ph)
             p.setPen(QColor("#71717a"))
             p.setFont(QFont("Microsoft YaHei", 12))
-            p.drawText(ph.rect(), Qt.AlignCenter, "已移至回收暂存区 (Ctrl+Z 撤销)")
+            ph_text = "Moved to staging trash (Ctrl+Z to undo)" if is_en else "已移至回收暂存区 (Ctrl+Z 撤销)"
+            p.drawText(ph.rect(), Qt.AlignCenter, ph_text)
             p.end()
             self.canvas.set_pixmap(ph)
 
@@ -3162,11 +3234,15 @@ class ViewportUnit(QFrame):
         act_row.setSpacing(8)
 
         key_num = self.display_key_num if self.display_key_num > 0 else (self.index_in_group + 1)
-        self.btn_keep = QPushButton(f" 保留 ({key_num})")
+        btn_keep_txt = f" Keep ({key_num})" if is_en else f" 保留 ({key_num})"
+        self.btn_keep = QPushButton(btn_keep_txt)
         self.btn_keep.setIcon(LucideIcon.icon("check", 14, "#52525b" if is_light else "#a1a1aa"))
         self.btn_keep.setFixedHeight(34)
         self.btn_keep.setCursor(Qt.PointingHandCursor)
-        self.btn_keep.setToolTip(f"保留此图并自动移除同组其余重复项 (快捷键 {key_num})")
+        self.btn_keep.setToolTip(
+            f"Keep this and auto-discard other duplicates (Key {key_num})" if is_en
+            else f"保留此图并自动移除同组其余重复项 (快捷键 {key_num})"
+        )
         if is_light:
             self.btn_keep.setStyleSheet("""
                 QPushButton {
@@ -3212,11 +3288,15 @@ class ViewportUnit(QFrame):
         self.btn_keep.clicked.connect(lambda: self.keepRequested.emit(self.item))
         act_row.addWidget(self.btn_keep, stretch=2)
 
-        self.btn_del = QPushButton(" 删除此图")
+        btn_del_txt = " Trash" if is_en else " 删除此图"
+        self.btn_del = QPushButton(btn_del_txt)
         self.btn_del.setIcon(LucideIcon.icon("trash", 14, "#ef4444"))
         self.btn_del.setFixedHeight(34)
         self.btn_del.setCursor(Qt.PointingHandCursor)
-        self.btn_del.setToolTip("仅移除此张图片 (软删除至暂存区，可按 Ctrl+Z 撤销)")
+        self.btn_del.setToolTip(
+            "Move this image to staging trash (press Ctrl+Z to undo)" if is_en
+            else "仅移除此张图片 (软删除至暂存区，可按 Ctrl+Z 撤销)"
+        )
         if is_light:
             self.btn_del.setStyleSheet("""
                 QPushButton {
@@ -3265,7 +3345,7 @@ class ViewportUnit(QFrame):
         if self.item.deleted or not os.path.exists(self.item.filepath):
             self.btn_keep.setEnabled(False)
             self.btn_del.setEnabled(False)
-            self.btn_del.setText("已移除")
+            self.btn_del.setText("Removed" if is_en else "已移除")
 
         layout.addLayout(act_row)
 
@@ -3562,7 +3642,7 @@ class AttributeInspectorPanel(QFrame):
         self.main_layout.setContentsMargins(16, 16, 16, 16)
         self.main_layout.setSpacing(12)
 
-        self.lbl_hdr = QLabel("属性差异检视")
+        self.lbl_hdr = QLabel(tr("prop_panel_title"))
         self.lbl_hdr.setStyleSheet("color: #f4f4f5; font-size: 13px; font-weight: 600; border: none;")
         self.main_layout.addWidget(self.lbl_hdr)
 
@@ -3572,6 +3652,11 @@ class AttributeInspectorPanel(QFrame):
         self.content_layout.setSpacing(10)
         self.main_layout.addWidget(self.content_widget)
         self.main_layout.addStretch(1)
+
+    def retranslate_ui(self):
+        self.lbl_hdr.setText(tr("prop_panel_title"))
+        if self._last_group:
+            self.update_group(self._last_group, self._last_item_a, self._last_item_b)
 
     def set_theme(self, theme: str):
         self.theme = theme
@@ -3642,20 +3727,22 @@ class AttributeInspectorPanel(QFrame):
         v_layout.setContentsMargins(10, 8, 10, 8)
         v_layout.setSpacing(4)
 
-        lbl_v_title = QLabel(f"相似度 {group.similarity_str} · {group.match_type}")
+        is_en = I18nManager.get_instance().is_english()
+        title_prefix = "Similarity" if is_en else "相似度"
+        lbl_v_title = QLabel(f"{title_prefix} {group.similarity_str} · {group.match_type}")
         lbl_v_title.setStyleSheet(f"color: {'#18181b' if is_light else '#e4e4e7'}; font-size: 11px; font-weight: 600; border: none;")
         v_layout.addWidget(lbl_v_title)
 
         if a.pixel_count > b.pixel_count:
-            reason = f"系统预选保留 图 {code_a}（分辨率更高）"
+            reason = f"Auto-selected Image {code_a} (Higher resolution)" if is_en else f"系统预选保留 图 {code_a}（分辨率更高）"
         elif b.pixel_count > a.pixel_count:
-            reason = f"系统预选保留 图 {code_b}（分辨率更高）"
+            reason = f"Auto-selected Image {code_b} (Higher resolution)" if is_en else f"系统预选保留 图 {code_b}（分辨率更高）"
         elif a.filesize > b.filesize:
-            reason = f"系统预选保留 图 {code_a}（文件体积更大）"
+            reason = f"Auto-selected Image {code_a} (Larger file size)" if is_en else f"系统预选保留 图 {code_a}（文件体积更大）"
         elif b.filesize > a.filesize:
-            reason = f"系统预选保留 图 {code_b}（文件体积更大）"
+            reason = f"Auto-selected Image {code_b} (Larger file size)" if is_en else f"系统预选保留 图 {code_b}（文件体积更大）"
         else:
-            reason = f"两图规格一致，推荐保留 图 {code_a}"
+            reason = f"Identical specs, recommend Image {code_a}" if is_en else f"两图规格一致，推荐保留 图 {code_a}"
 
         lbl_v_sub = QLabel(reason)
         lbl_v_sub.setWordWrap(True)
@@ -3664,7 +3751,12 @@ class AttributeInspectorPanel(QFrame):
 
         # 多图提示
         if len(group.items) > 2:
-            tip_multi = QLabel(f"本组包含 {len(group.items)} 张同款图片\n可在顶部切换对比或按 Delete 一键清理其余副本")
+            tip_text = (
+                f"This group contains {len(group.items)} copies.\nSwitch comparison above or press Delete to clean rest."
+                if is_en else
+                f"本组包含 {len(group.items)} 张同款图片\n可在顶部切换对比或按 Delete 一键清理其余副本"
+            )
+            tip_multi = QLabel(tip_text)
             tip_multi.setWordWrap(True)
             tip_multi.setStyleSheet(f"color: {'#2563eb' if is_light else '#60a5fa'}; font-size: 11px; border: none; padding-top: 4px;")
             v_layout.addWidget(tip_multi)
@@ -3678,11 +3770,11 @@ class AttributeInspectorPanel(QFrame):
         mtime_b = datetime.datetime.fromtimestamp(b.mtime).strftime("%Y-%m-%d %H:%M") if b.mtime else "-"
 
         rows_spec = [
-            ("文件名", a.filename, b.filename, "neutral"),
-            ("分辨率", a.resolution_str, b.resolution_str, "res"),
-            ("文件体积", a.size_str, b.size_str, "size"),
-            ("文件格式", ext_a, ext_b, "diff_warn" if ext_a != ext_b else "same"),
-            ("修改时间", mtime_a, mtime_b, "neutral"),
+            (tr("prop_filename"), a.filename, b.filename, "neutral"),
+            (tr("prop_resolution"), a.resolution_str, b.resolution_str, "res"),
+            (tr("prop_filesize"), a.size_str, b.size_str, "size"),
+            (tr("prop_format"), ext_a, ext_b, "diff_warn" if ext_a != ext_b else "same"),
+            (tr("prop_mtime"), mtime_a, mtime_b, "neutral"),
         ]
 
         for attr_name, val_a, val_b, mode in rows_spec:
@@ -3716,7 +3808,7 @@ class AttributeInspectorPanel(QFrame):
             hdr_row.addStretch(1)
 
             if is_diff and mode in ("res", "size", "diff_warn"):
-                lbl_badge = QLabel("存在差异")
+                lbl_badge = QLabel("Diff" if is_en else "存在差异")
                 lbl_badge.setStyleSheet(f"color: {'#d97706' if is_light else '#f59e0b'}; font-size: 10px; border: none;")
                 hdr_row.addWidget(lbl_badge)
             b_lay.addLayout(hdr_row)
@@ -3846,6 +3938,12 @@ class DedupMainWindow(QMainWindow):
 
         self._init_ui()
         self._apply_global_theme(self._current_theme)
+
+        # 初始化并连接国际化双语管理器
+        I18nManager.get_instance().set_settings_path(self.paths.settings_json_path)
+        I18nManager.get_instance().languageChanged.connect(self._retranslate_ui)
+        self._retranslate_ui()
+
         self._bind_shortcuts()
         self._switch_phase(self.PHASE_IMPORT)
 
@@ -3916,6 +4014,155 @@ class DedupMainWindow(QMainWindow):
             "界面色彩已动态应用，设置已自动保存",
             accent_rgb
         )
+
+    def _toggle_language(self):
+        new_lang = toggle_lang()
+        is_en = (new_lang == LANG_EN)
+        lang_str = "English" if is_en else "简体中文"
+        self.toast_banner.show_toast(
+            f"Language: {lang_str}" if is_en else f"语言已切换为：{lang_str}",
+            "UI text updated smoothly" if is_en else "界面文本已平滑动态更新并自动保存",
+            (16, 185, 129)
+        )
+
+    def _retranslate_ui(self, lang: Optional[str] = None):
+        is_en = I18nManager.get_instance().is_english()
+
+        # 1. 语言切换按钮文字与 Tooltip
+        if hasattr(self, "btn_lang_toggle"):
+            self.btn_lang_toggle.setText("中" if is_en else "EN")
+            self.btn_lang_toggle.setToolTip("切换为简体中文" if is_en else "Switch to English")
+
+        # 2. 模式选择分段控件
+        if hasattr(self, "seg_mode"):
+            self.seg_mode.retranslate_ui()
+
+        # 3. 顶栏输入框 placeholder 与子文件夹开关
+        if hasattr(self, "path_input_1"):
+            self.path_input_1.setPlaceholderText(tr("folder1_placeholder"))
+        if hasattr(self, "path_input_2"):
+            self.path_input_2.setPlaceholderText(tr("folder2_placeholder"))
+        if hasattr(self, "btn_subfolders_tb"):
+            self.btn_subfolders_tb.setText(" " + tr("subfolders_chk"))
+        if hasattr(self, "btn_subfolders"):
+            self.btn_subfolders.setText(" " + tr("subfolders_optional"))
+
+        # 4. 阶段 1 导入态拖拽卡片
+        if hasattr(self, "drop_card_1"):
+            is_cross = getattr(self.seg_mode, "is_cross", False) if hasattr(self, "seg_mode") else False
+            self.drop_card_1.update_i18n(
+                tr("drop_title_1"),
+                tr("drop_browse_tip"),
+                tr("drop_tip_cross") if is_cross else tr("drop_tip_single")
+            )
+        if hasattr(self, "drop_card_2"):
+            self.drop_card_2.update_i18n(
+                tr("drop_title_2"),
+                tr("drop_browse_tip"),
+                tr("drop_tip_cross")
+            )
+
+        # 5. 开始智能查重按钮
+        if hasattr(self, "btn_start_cta"):
+            self.btn_start_cta.setText(tr("btn_start_scan"))
+
+        # 6. 灵敏度选择器与交互式胶囊栏
+        if hasattr(self, "sens_selector"):
+            self.sens_selector._update_button_label()
+            self.sens_selector._rebuild_menu()
+        if hasattr(self, "sens_interactive_bar"):
+            self.sens_interactive_bar.retranslate_ui()
+
+        # 7. 审查态左栏分组
+        if hasattr(self, "edit_search"):
+            self.edit_search.setPlaceholderText(tr("search_placeholder"))
+        if hasattr(self, "combo_filter"):
+            curr_f = self.combo_filter.currentData() or "pending"
+            self.combo_filter.blockSignals(True)
+            self.combo_filter.clear()
+            self.combo_filter.addItem("Pending" if is_en else "待决断", "pending")
+            self.combo_filter.addItem("All Groups" if is_en else "全部组", "all")
+            self.combo_filter.addItem("Resolved" if is_en else "已处理", "resolved")
+            idx = self.combo_filter.findData(curr_f)
+            self.combo_filter.setCurrentIndex(max(0, idx))
+            self.combo_filter.blockSignals(False)
+
+        if hasattr(self, "combo_sort"):
+            curr_s = self.combo_sort.currentData() or "similarity"
+            self.combo_sort.blockSignals(True)
+            self.combo_sort.clear()
+            self.combo_sort.addItem(tr("sort_similarity"), "similarity")
+            self.combo_sort.addItem(tr("sort_size"), "size")
+            idx = self.combo_sort.findData(curr_s)
+            self.combo_sort.setCurrentIndex(max(0, idx))
+            self.combo_sort.blockSignals(False)
+
+        # 8. 审查态中栏浮动胶囊条
+        if hasattr(self, "btn_cap_reset"):
+            self.btn_cap_reset.setText(" " + tr("btn_reset_zoom"))
+        if hasattr(self, "btn_cap_sync"):
+            self.btn_cap_sync.setText(" " + tr("btn_sync_zoom"))
+        if hasattr(self, "btn_cap_heatmap"):
+            self.btn_cap_heatmap.setText(" " + tr("btn_diff_heatmap"))
+        if hasattr(self, "btn_cap_curtain"):
+            self.btn_cap_curtain.setText(" " + tr("btn_curtain_mode"))
+        if hasattr(self, "btn_cap_grid"):
+            self.btn_cap_grid.setText(" " + ("Grid View" if is_en else "双列平铺"))
+        if hasattr(self, "btn_cap_single_col"):
+            self.btn_cap_single_col.setText(" " + ("Single Column" if is_en else "单列大图"))
+        if hasattr(self, "btn_cap_whitelist"):
+            self.btn_cap_whitelist.setText(" Whitelist (Space)" if is_en else " 白名单 (Space)")
+        if hasattr(self, "btn_cap_undo"):
+            self.btn_cap_undo.setText(" Undo" if is_en else " 撤销")
+
+        # 9. 底部快捷键与帮助菜单
+        if hasattr(self, "lbl_dock_shortcuts"):
+            if is_en:
+                self.lbl_dock_shortcuts.setText("1 Keep Left (A)  |  2 Keep Right (B)  |  Space Whitelist  |  Ctrl+Z Undo")
+            else:
+                self.lbl_dock_shortcuts.setText("1 保留左图 (A)  |  2 保留右图 (B)  |  Space 白名单  |  Ctrl+Z 撤销")
+
+        if hasattr(self, "btn_prev_grp"):
+            self.btn_prev_grp.setText(" " + tr("btn_prev_group"))
+        if hasattr(self, "btn_next_grp"):
+            self.btn_next_grp.setText(tr("btn_next_group") + " ")
+
+        if hasattr(self, "lbl_dock_progress") and not getattr(self, "groups", None):
+            self.lbl_dock_progress.setText(tr("status_ready") if not is_en else "Ready")
+
+        if hasattr(self, "btn_subfolders_cta"):
+            self.btn_subfolders_cta.setText(" " + tr("subfolders_optional"))
+
+        if hasattr(self, "btn_recheck"):
+            self.btn_recheck.setText(" " + ("Recheck" if is_en else "极速复查"))
+            self.btn_recheck.setToolTip(
+                "Re-scan remaining files with cache in seconds" if is_en
+                else "复用特征缓存与排除矩阵，1秒复查当前剩余文件是否零重复"
+            )
+
+        if hasattr(self, "btn_toggle_right"):
+            self.btn_toggle_right.setToolTip(
+                "Toggle Properties Panel" if is_en else "折叠 / 展开右侧属性差异检视面板"
+            )
+
+        if hasattr(self, "btn_help"):
+            self.btn_help.setToolTip(
+                "User Guide & More Options" if is_en else "操作指南、导出副本与缓存管理"
+            )
+
+        if hasattr(self, "custom_titlebar") and hasattr(self.custom_titlebar, "retranslate_ui"):
+            self.custom_titlebar.retranslate_ui()
+
+        if hasattr(self, "right_inspector") and hasattr(self.right_inspector, "retranslate_ui"):
+            self.right_inspector.retranslate_ui()
+
+        if hasattr(self, "_build_help_menu"):
+            self._build_help_menu()
+
+        # 10. 刷新当前正在显示的视口卡片与列表
+        if hasattr(self, "groups") and self.groups:
+            self._refresh_group_list()
+            self._render_current_group_viewports()
 
     def _apply_global_theme(self, theme: str):
         self._current_theme = theme
@@ -4254,6 +4501,29 @@ class DedupMainWindow(QMainWindow):
                 self.btn_theme_toggle.setToolTip("切换为浅色模式 (快捷键 F2)")
             self.btn_theme_toggle.setStyleSheet(self._icon_btn_css())
 
+        if hasattr(self, "btn_lang_toggle"):
+            is_en = I18nManager.get_instance().is_english()
+            self.btn_lang_toggle.setText("中" if is_en else "EN")
+            self.btn_lang_toggle.setToolTip("切换为简体中文" if is_en else "Switch to English")
+            fg_color = "#09090b" if is_light else "#f4f4f5"
+            bg_color = "#f4f4f5" if is_light else "#27272a"
+            border_color = "#cbd5e1" if is_light else "rgba(255, 255, 255, 0.12)"
+            self.btn_lang_toggle.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {bg_color};
+                    color: {fg_color};
+                    font-size: 11px;
+                    font-weight: 700;
+                    padding: 0 8px;
+                    border: 1px solid {border_color};
+                    border-radius: 6px;
+                }}
+                QPushButton:hover {{
+                    background-color: {'#e2e8f0' if is_light else '#3f3f46'};
+                    color: {'#000000' if is_light else '#ffffff'};
+                }}
+            """)
+
         if getattr(self, "lbl_top_title", None) is not None:
             title_color = "#18181b" if is_light else "#f4f4f5"
             self.lbl_top_title.setStyleSheet(f"color: {title_color}; font-size: 14px; font-weight: 600; border: none;")
@@ -4447,6 +4717,15 @@ class DedupMainWindow(QMainWindow):
         self.btn_subfolders_tb.setCursor(Qt.PointingHandCursor)
         self.btn_subfolders_tb.clicked.connect(self._on_subfolders_toggled)
         tb_layout.addWidget(self.btn_subfolders_tb)
+
+        # 语言切换按钮 (中英双语国际化切换：中文 / EN)
+        self.btn_lang_toggle = QPushButton()
+        self.btn_lang_toggle.setFixedHeight(32)
+        self.btn_lang_toggle.setMinimumWidth(38)
+        self.btn_lang_toggle.setCursor(Qt.PointingHandCursor)
+        self.btn_lang_toggle.setStyleSheet(self._icon_btn_css())
+        self.btn_lang_toggle.clicked.connect(self._toggle_language)
+        tb_layout.addWidget(self.btn_lang_toggle)
 
         # 主题切换按钮（深色 / 浅色模式，快捷键 F2）
         self.btn_theme_toggle = QPushButton()
@@ -4686,43 +4965,43 @@ class DedupMainWindow(QMainWindow):
     def _build_help_menu(self):
         menu = QMenu(self)
 
-        act_theme = QAction("切换深色 / 浅色模式... [F2]", self)
+        act_theme = QAction(tr("menu_theme"), self)
         act_theme.triggered.connect(self._toggle_theme)
         menu.addAction(act_theme)
 
-        act_guide = QAction("使用指南与常见问题 (白名单 / 找回已删图)... [F1]", self)
+        act_guide = QAction(tr("menu_about"), self)
         act_guide.triggered.connect(self._show_about_dialog)
         menu.addAction(act_guide)
 
-        act_lic = QAction("商业授权与机器码管理 (RSA-2048)...", self)
+        act_lic = QAction(tr("menu_license"), self)
         act_lic.triggered.connect(lambda: LicenseActivationDialog(self.license_mgr, self).exec())
         menu.addAction(act_lic)
 
-        act_upd = QAction("检查版本更新 (OTA)...", self)
+        act_upd = QAction(tr("menu_check_updates"), self)
         act_upd.triggered.connect(lambda: AutoUpdateDialog(self.paths, self.logger, self).exec())
         menu.addAction(act_upd)
 
         menu.addSeparator()
 
-        act_export = QAction("导出分组副本至文件夹...", self)
+        act_export = QAction(tr("menu_export_groups"), self)
         act_export.triggered.connect(self._export_groups)
         menu.addAction(act_export)
 
-        act_return = QAction("返回准备与导入态视图", self)
+        act_return = QAction(tr("menu_back_import"), self)
         act_return.triggered.connect(lambda: self._switch_phase(self.PHASE_IMPORT))
         menu.addAction(act_return)
 
         menu.addSeparator()
 
-        act_open_trash = QAction("打开已删除图片回收暂存区 (staging_trash)...", self)
+        act_open_trash = QAction(tr("menu_open_trash"), self)
         act_open_trash.triggered.connect(self._open_trash_dir)
         menu.addAction(act_open_trash)
 
-        act_open_logs = QAction("打开运行日志与缓存目录 (%LOCALAPPDATA%)...", self)
+        act_open_logs = QAction(tr("menu_open_logs"), self)
         act_open_logs.triggered.connect(lambda: os.startfile(self.paths.local_root))
         menu.addAction(act_open_logs)
 
-        act_clear = QAction("清空保留白名单与特征缓存...", self)
+        act_clear = QAction(tr("menu_clear_cache"), self)
         act_clear.triggered.connect(self._on_reset_whitelist_menu)
         menu.addAction(act_clear)
 
@@ -6155,9 +6434,13 @@ class DedupMainWindow(QMainWindow):
             QMessageBox.warning(self, "打开暂存区失败", f"无法打开暂存区目录：{e}\n路径：{self.paths.trash_dir}")
 
     def _show_about_dialog(self):
+        is_en = I18nManager.get_instance().is_english()
         hw_code = MachineFingerprint.get_machine_code()
         dlg = QDialog(self)
-        dlg.setWindowTitle(f"使用指南与常见问题帮助中心 — EVE_IDT v{APP_VERSION}")
+        dlg.setWindowTitle(
+            f"User Guide & Help Center — EVE_IDT v{APP_VERSION}" if is_en
+            else f"使用指南与常见问题帮助中心 — EVE_IDT v{APP_VERSION}"
+        )
         dlg.resize(760, 650)
         dlg.setStyleSheet("""
             QDialog {
@@ -6179,81 +6462,149 @@ class DedupMainWindow(QMainWindow):
         lay.setContentsMargins(20, 18, 20, 18)
         lay.setSpacing(14)
 
-        hdr = QLabel(f"使用指南与常见问题解答 (FAQ)  ·  v{APP_VERSION}")
+        hdr_text = f"User Guide & FAQ  ·  v{APP_VERSION}" if is_en else f"使用指南与常见问题解答 (FAQ)  ·  v{APP_VERSION}"
+        hdr = QLabel(hdr_text)
         hdr.setStyleSheet("color: #f4f4f5; font-size: 16px; font-weight: 600; border: none;")
         lay.addWidget(hdr)
 
         browser = QTextBrowser(dlg)
         browser.setOpenExternalLinks(False)
-        browser.setHtml(f"""
-        <div style="line-height: 1.65; color: #d4d4d8;">
-            <h3 style="color: #60a5fa; margin-top: 2px; margin-bottom: 6px;">一、【白名单】的具体功能与操作方式</h3>
-            <p style="margin-top: 0; margin-bottom: 6px;">
-                <b>1. 白名单有什么用？</b><br/>
-                当软件查出一组相似图片（例如<b>同款不同色、不同尺寸版本、或换了局部文字的变体图</b>），如果您觉得<b>“这两张图都有用，两张都要留着，不删任何一张”</b>，就可以将该组加入<b>【白名单】</b>：<br/>
-                • <b>零删除、全部保留</b>：组内所有图片均安全保留在原文件夹，不会删除任何文件；<br/>
-                • <b>永久免打扰记忆</b>：软件会将这一对图片的放行关系永久记录到本地数据库。之后点击「极速复查」，或日后往文件夹加入新图重新扫描时，<b>这一对图片都不会再重复跳出来打扰您</b>。
-            </p>
-            <p style="margin-top: 4px; margin-bottom: 12px;">
-                <b>2. 白名单具体怎么操作？</b><br/>
-                • <b>加入白名单</b>：看图时直接按键盘 <span style="color: #10b981; font-weight: 600;">[空格键 Space]</span>，或点击画布上方胶囊栏的 <b>「白名单 (Space)」</b> 按钮，当前组即全部保留并自动跳到下一组。<br/>
-                • <b>加错了怎么移出（单组取消）</b>：将左侧列表顶部的筛选下拉框从「待决断」切换为 <b>「已处理」</b> 或 <b>「全部组」</b>，点中那一组，再次按 <span style="color: #f59e0b; font-weight: 600;">[空格键 Space]</span>（或点「移出白名单」）即可撤回。<br/>
-                • <b>清空所有历史白名单</b>：点击本窗口下方 <b>「清空白名单与缓存」</b> 按钮（或右上角 <b>?</b> 菜单 ->「清空保留白名单与特征缓存...」），即可恢复初始状态重新扫描出所有相似图。
-            </p>
 
-            <hr style="border: none; border-top: 1px solid #27272a; margin: 12px 0;"/>
+        if is_en:
+            content_html = f"""
+            <div style="line-height: 1.65; color: #d4d4d8;">
+                <h3 style="color: #60a5fa; margin-top: 2px; margin-bottom: 6px;">1. Whitelist Features & How to Use</h3>
+                <p style="margin-top: 0; margin-bottom: 6px;">
+                    <b>What is Whitelist?</b><br/>
+                    When similar images are flagged (e.g. variants with different colors, resolutions, or local text changes) and you wish to <b>keep both images without deleting either</b>, add them to <b>Whitelist</b>:<br/>
+                    • <b>Zero Deletion</b>: All files in the group remain safe in their original directories.<br/>
+                    • <b>Permanent Memory</b>: The pair relationship is recorded in the local database. Subsequent rechecks or rescans will not flag this pair again.
+                </p>
+                <p style="margin-top: 4px; margin-bottom: 12px;">
+                    <b>How to Operate:</b><br/>
+                    • <b>Add to Whitelist</b>: Press <span style="color: #10b981; font-weight: 600;">[Space]</span> or click <b>"Whitelist (Space)"</b> on the top capsule bar.<br/>
+                    • <b>Undo / Remove</b>: Filter by "Resolved" or "All Groups", select the group, and press <span style="color: #f59e0b; font-weight: 600;">[Space]</span> again.<br/>
+                    • <b>Clear All Whitelists</b>: Click "Clear Whitelist & Cache" below or via the top-right "?" menu.
+                </p>
 
-            <h3 style="color: #10b981; margin-top: 6px; margin-bottom: 6px;">二、删除的图片去了哪里？如何找回或彻底清空？</h3>
-            <p style="margin-top: 0; margin-bottom: 6px;">
-                为了防止误删重要原图，软件中的「删除此项 / 仅保留此项」<b>不会直接彻底粉碎文件</b>，而是将淘汰的图片安全移入了软件内置的<b>【安全回收暂存区 (staging_trash)】</b>。
-            </p>
-            <p style="margin-top: 4px; margin-bottom: 12px;">
-                • <b>1. 删错了怎么马上恢复？（最推荐）</b><br/>
-                  直接按键盘 <span style="color: #60a5fa; font-weight: 600;">[Ctrl + Z]</span>，或点击画布上方胶囊栏的 <b>「撤销 (Ctrl+Z)」</b> 按钮，图片就会自动恢复成<b>原来的文件名并 100% 放回原来的文件夹路径</b>（支持连续多次撤销）。<br/>
-                • <b>2. 存放已删除图片的文件夹在哪里？</b><br/>
-                  路径：<code style="color: #f59e0b;">{self.paths.trash_dir}</code><br/>
-                  您可以直接点击下方 <b>「打开已删除图片暂存区」</b> 按钮（或右上角 <b>?</b> 菜单 ->「打开已删除图片回收暂存区...」）一键打开该文件夹，随时找回历史删除的图片，或将其彻底清空以释放磁盘空间。
-            </p>
+                <hr style="border: none; border-top: 1px solid #27272a; margin: 12px 0;"/>
 
-            <hr style="border: none; border-top: 1px solid #27272a; margin: 12px 0;"/>
+                <h3 style="color: #10b981; margin-top: 6px; margin-bottom: 6px;">2. Where Do Trashed Images Go?</h3>
+                <p style="margin-top: 0; margin-bottom: 6px;">
+                    To prevent accidental loss, discarded images are moved to the local <b>Safety Staging Trash (staging_trash)</b> instead of permanent destruction.
+                </p>
+                <p style="margin-top: 4px; margin-bottom: 12px;">
+                    • <b>Undo Trashed Files</b>: Press <span style="color: #60a5fa; font-weight: 600;">[Ctrl + Z]</span> to restore immediately with original filenames and paths.<br/>
+                    • <b>Folder Location</b>: <code style="color: #f59e0b;">{self.paths.trash_dir}</code><br/>
+                      Click "Open Staging Trash" below anytime to retrieve files or clear disk space.
+                </p>
 
-            <h3 style="color: #f59e0b; margin-top: 6px; margin-bottom: 6px;">三、扫描范围与三种查重灵敏度说明</h3>
-            <p style="margin-top: 0; margin-bottom: 12px;">
-                • <b>扫描范围控制</b>：默认<b>仅扫描当前顶层文件夹</b>（不含子文件夹）；如需连同所有嵌套子文件夹一起查重，请勾选 <b>「包含子文件夹」</b> 按钮。<br/>
-                • <b>标准模式（推荐）</b>：兼顾原图与局部变体，精准检出完全相同、跨分辨率缩放压缩，以及加水印/换字、局部微调的相似图片。<br/>
-                • <b>严格模式（仅限同图）</b>：仅检出画面高度一致的原图、格式转换与缩放压缩图，自动忽略换字或改色变体，零误报。<br/>
-                • <b>深度宽松（广覆盖）</b>：放宽特征匹配阈值，连同大幅调色、AI 图生图重绘变体及近似构图图片一并检出供人工排查。
-            </p>
+                <hr style="border: none; border-top: 1px solid #27272a; margin: 12px 0;"/>
 
-            <hr style="border: none; border-top: 1px solid #27272a; margin: 12px 0;"/>
+                <h3 style="color: #f59e0b; margin-top: 6px; margin-bottom: 6px;">3. Sensitivity Presets & Scope</h3>
+                <p style="margin-top: 0; margin-bottom: 12px;">
+                    • <b>Subfolders Scope</b>: Default is top-level folder only. Enable "Include subfolders" for recursive scanning.<br/>
+                    • <b>Standard (Recommended)</b>: Detects exact matches, recompressed/scaled versions, and text/watermark variants.<br/>
+                    • <b>Strict (Exact Match)</b>: Only flags identical or lossless/minor recompression images. Zero false alarms.<br/>
+                    • <b>Loose (Wide Coverage)</b>: Broad tolerance for heavy crops, stretching, background changes, and AI inpainting.
+                </p>
 
-            <h3 style="color: #a78bfa; margin-top: 6px; margin-bottom: 6px;">四、纯键盘流水线快捷键一览</h3>
-            <p style="margin-top: 0; margin-bottom: 12px;">
-                • 按 <b>[1]</b>：仅保留左侧原始图 A（自动软删除同组其余对比图片）<br/>
-                • 按 <b>[2]</b>：仅保留右侧对比图 B（自动软删除同组其余图片）<br/>
-                • 按 <b>[Delete]</b>：保留左侧原始图 A，快速废弃右侧对比图副本<br/>
-                • 按 <b>[Space 空格键]</b>：将当前组加入保留白名单（或移出白名单）<br/>
-                • 按 <b>[Ctrl + Z]</b>：原路径无损撤销上一步删除操作<br/>
-                • 按 <b>[← / → 左右方向键]</b>：切换上一组 / 下一组  |  按 <b>[F1]</b>：打开本帮助中心
-            </p>
+                <hr style="border: none; border-top: 1px solid #27272a; margin: 12px 0;"/>
 
-            <hr style="border: none; border-top: 1px solid #27272a; margin: 12px 0;"/>
+                <h3 style="color: #a78bfa; margin-top: 6px; margin-bottom: 6px;">4. Keyboard Shortcuts</h3>
+                <p style="margin-top: 0; margin-bottom: 12px;">
+                    • <b>[1]</b>: Keep original Image A (auto-trash others)<br/>
+                    • <b>[2]</b>: Keep comparison Image B (auto-trash others)<br/>
+                    • <b>[Delete]</b>: Keep Image A, quickly discard comparison Image B<br/>
+                    • <b>[Space]</b>: Whitelist current group (keep all)<br/>
+                    • <b>[Ctrl + Z]</b>: Undo previous delete operation<br/>
+                    • <b>[← / →]</b>: Previous / Next group  |  <b>[F1]</b>: Open Help Center
+                </p>
 
-            <div style="color: #71717a; font-size: 11px;">
-                <b>运行环境与数据隔离信息：</b><br/>
-                • 机器授权指纹：{hw_code}<br/>
-                • 已删图片暂存区：{self.paths.trash_dir}<br/>
-                • 状态数据库 (SQLite)：{self.paths.sqlite_db_path}<br/>
-                • 轮转日志目录：{self.paths.log_dir}
+                <hr style="border: none; border-top: 1px solid #27272a; margin: 12px 0;"/>
+
+                <div style="color: #71717a; font-size: 11px;">
+                    <b>System Diagnostics & Environment:</b><br/>
+                    • Machine Code: {hw_code}<br/>
+                    • Staging Trash: {self.paths.trash_dir}<br/>
+                    • SQLite DB: {self.paths.sqlite_db_path}<br/>
+                    • Log Directory: {self.paths.log_dir}
+                </div>
             </div>
-        </div>
-        """)
+            """
+        else:
+            content_html = f"""
+            <div style="line-height: 1.65; color: #d4d4d8;">
+                <h3 style="color: #60a5fa; margin-top: 2px; margin-bottom: 6px;">一、【白名单】的具体功能与操作方式</h3>
+                <p style="margin-top: 0; margin-bottom: 6px;">
+                    <b>1. 白名单有什么用？</b><br/>
+                    当软件查出一组相似图片（例如<b>同款不同色、不同尺寸版本、或换了局部文字的变体图</b>），如果您觉得<b>“这两张图都有用，两张都要留着，不删任何一张”</b>，就可以将该组加入<b>【白名单】</b>：<br/>
+                    • <b>零删除、全部保留</b>：组内所有图片均安全保留在原文件夹，不会删除任何文件；<br/>
+                    • <b>永久免打扰记忆</b>：软件会将这一对图片的放行关系永久记录到本地数据库。之后点击「极速复查」，或日后往文件夹加入新图重新扫描时，<b>这一对图片都不会再重复跳出来打扰您</b>。
+                </p>
+                <p style="margin-top: 4px; margin-bottom: 12px;">
+                    <b>2. 白名单具体怎么操作？</b><br/>
+                    • <b>加入白名单</b>：看图时直接按键盘 <span style="color: #10b981; font-weight: 600;">[空格键 Space]</span>，或点击画布上方胶囊栏的 <b>「白名单 (Space)」</b> 按钮，当前组即全部保留并自动跳到下一组。<br/>
+                    • <b>加错了怎么移出（单组取消）</b>：将左侧列表顶部的筛选下拉框从「待决断」切换为 <b>「已处理」</b> 或 <b>「全部组」</b>，点中那一组，再次按 <span style="color: #f59e0b; font-weight: 600;">[空格键 Space]</span>（或点「移出白名单」）即可撤回。<br/>
+                    • <b>清空所有历史白名单</b>：点击本窗口下方 <b>「清空白名单与缓存」</b> 按钮（或右上角 <b>?</b> 菜单 ->「清空保留白名单与特征缓存...」），即可恢复初始状态重新扫描出所有相似图。
+                </p>
+
+                <hr style="border: none; border-top: 1px solid #27272a; margin: 12px 0;"/>
+
+                <h3 style="color: #10b981; margin-top: 6px; margin-bottom: 6px;">二、删除的图片去了哪里？如何找回或彻底清空？</h3>
+                <p style="margin-top: 0; margin-bottom: 6px;">
+                    为了防止误删重要原图，软件中的「删除此项 / 仅保留此项」<b>不会直接彻底粉碎文件</b>，而是将淘汰的图片安全移入了软件内置的<b>【安全回收暂存区 (staging_trash)】</b>。
+                </p>
+                <p style="margin-top: 4px; margin-bottom: 12px;">
+                    • <b>1. 删错了怎么马上恢复？（最推荐）</b><br/>
+                      直接按键盘 <span style="color: #60a5fa; font-weight: 600;">[Ctrl + Z]</span>，或点击画布上方胶囊栏的 <b>「撤销 (Ctrl+Z)」</b> 按钮，图片就会自动恢复成<b>原来的文件名并 100% 放回原来的文件夹路径</b>（支持连续多次撤销）。<br/>
+                    • <b>2. 存放已删除图片的文件夹在哪里？</b><br/>
+                      路径：<code style="color: #f59e0b;">{self.paths.trash_dir}</code><br/>
+                      您可以直接点击下方 <b>「打开已删除图片暂存区」</b> 按钮（或右上角 <b>?</b> 菜单 ->「打开已删除图片回收暂存区...」）一键打开该文件夹，随时找回历史删除的图片，或将其彻底清空以释放磁盘空间。
+                </p>
+
+                <hr style="border: none; border-top: 1px solid #27272a; margin: 12px 0;"/>
+
+                <h3 style="color: #f59e0b; margin-top: 6px; margin-bottom: 6px;">三、扫描范围与三种查重灵敏度说明</h3>
+                <p style="margin-top: 0; margin-bottom: 12px;">
+                    • <b>扫描范围控制</b>：默认<b>仅扫描当前顶层文件夹</b>（不含子文件夹）；如需连同所有嵌套子文件夹一起查重，请勾选 <b>「包含子文件夹」</b> 按钮。<br/>
+                    • <b>标准模式（推荐）</b>：兼顾原图与局部变体，精准检出完全相同、跨分辨率缩放压缩，以及加水印/换字、局部微调的相似图片。<br/>
+                    • <b>严格模式（仅限同图）</b>：仅检出画面高度一致的原图、格式转换与缩放压缩图，自动忽略换字或改色变体，零误报。<br/>
+                    • <b>深度宽松（广覆盖）</b>：放宽特征匹配阈值，连同大幅调色、AI 图生图重绘变体及近似构图图片一并检出供人工排查。
+                </p>
+
+                <hr style="border: none; border-top: 1px solid #27272a; margin: 12px 0;"/>
+
+                <h3 style="color: #a78bfa; margin-top: 6px; margin-bottom: 6px;">四、纯键盘流水线快捷键一览</h3>
+                <p style="margin-top: 0; margin-bottom: 12px;">
+                    • 按 <b>[1]</b>：仅保留左侧原始图 A（自动软删除同组其余对比图片）<br/>
+                    • 按 <b>[2]</b>：仅保留右侧对比图 B（自动软删除同组其余图片）<br/>
+                    • 按 <b>[Delete]</b>：保留左侧原始图 A，快速废弃右侧对比图副本<br/>
+                    • 按 <b>[Space 空格键]</b>：将当前组加入保留白名单（或移出白名单）<br/>
+                    • 按 <b>[Ctrl + Z]</b>：原路径无损撤销上一步删除操作<br/>
+                    • 按 <b>[← / → 左右方向键]</b>：切换上一组 / 下一组  |  按 <b>[F1]</b>：打开本帮助中心
+                </p>
+
+                <hr style="border: none; border-top: 1px solid #27272a; margin: 12px 0;"/>
+
+                <div style="color: #71717a; font-size: 11px;">
+                    <b>运行环境与数据隔离信息：</b><br/>
+                    • 机器授权指纹：{hw_code}<br/>
+                    • 已删图片暂存区：{self.paths.trash_dir}<br/>
+                    • 状态数据库 (SQLite)：{self.paths.sqlite_db_path}<br/>
+                    • 轮转日志目录：{self.paths.log_dir}
+                </div>
+            </div>
+            """
+
+        browser.setHtml(content_html)
         lay.addWidget(browser, stretch=1)
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
 
-        btn_open_trash = QPushButton(" 打开已删除图片暂存区 (staging_trash)")
+        btn_open_trash_text = " Open Staging Trash (staging_trash)" if is_en else " 打开已删除图片暂存区 (staging_trash)"
+        btn_open_trash = QPushButton(btn_open_trash_text)
         btn_open_trash.setIcon(LucideIcon.icon("trash", 14, "#10b981"))
         btn_open_trash.setFixedHeight(34)
         btn_open_trash.setCursor(Qt.PointingHandCursor)
@@ -6261,7 +6612,8 @@ class DedupMainWindow(QMainWindow):
         btn_open_trash.clicked.connect(self._open_trash_dir)
         btn_row.addWidget(btn_open_trash)
 
-        btn_clear_wl = QPushButton(" 清空白名单与特征缓存")
+        btn_clear_wl_text = " Clear Whitelist & Cache" if is_en else " 清空白名单与特征缓存"
+        btn_clear_wl = QPushButton(btn_clear_wl_text)
         btn_clear_wl.setIcon(LucideIcon.icon("refresh", 14, "#f59e0b"))
         btn_clear_wl.setFixedHeight(34)
         btn_clear_wl.setCursor(Qt.PointingHandCursor)
@@ -6271,7 +6623,7 @@ class DedupMainWindow(QMainWindow):
 
         btn_row.addStretch(1)
 
-        btn_ok = QPushButton("我知道了")
+        btn_ok = QPushButton("Got it" if is_en else "我知道了")
         btn_ok.setFixedSize(110, 34)
         btn_ok.setCursor(Qt.PointingHandCursor)
         btn_ok.setStyleSheet("""

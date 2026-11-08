@@ -28,7 +28,7 @@ PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(PROJECT_DIR, "github_ota_config.json")
 VERSION_JSON_FILE = os.path.join(PROJECT_DIR, "version.json")
 HOTPATCH_ZIP_FILE = os.path.join(PROJECT_DIR, "ota_hotpatch.zip")
-HOTPATCH_SOURCES = ["app.py", "engine.py", "core_infra.py", "generate_icon.py", "github_ota_config.json"]
+HOTPATCH_SOURCES = ["app.py", "engine.py", "core_infra.py", "generate_icon.py", "i18n.py", "github_ota_config.json"]
 
 
 def sign_sha256_hex(sha256_hex: str) -> str:
