@@ -1,17 +1,17 @@
 {
   "version": "4.1.4",
   "silent": true,
-  "revision": "20261108172122",
-  "published_at": "2026-11-08 17:21:22",
+  "revision": "20261108173517",
+  "published_at": "2026-11-08 17:35:17",
   "hotpatch_files": {
-    "app.py": "73030801d9b0424a97bb4c1f985a2b1f13ba5bb45b4a5cd21c5211f67e4ae3ba",
+    "app.py": "0dabf1879cdd4fe29b3cea880045787ea6c8e0da4818fff1dc85417812d72f8f",
     "engine.py": "5e22fc6e8b1d96927f93c6de82b937158cf0a4c2a5464eafbd4ba976ac341ede",
     "core_infra.py": "5ce4a995c2af123f1bf1a1bf4f53f3b2020cf502312374b28b8f399751e78f96",
     "generate_icon.py": "bb64c9ce2ed9fffd5bc52f8bf64ccdd7dd8f0496ee0dfd42d64ace787edbf9db",
     "github_ota_config.json": "1dd58c6aae5ebb6933471858809869312d77d4d064f7f428820f5ea1410b2dab"
   },
-  "hotpatch_size_kb": 396.1,
-  "hotpatch_sha256": "6df62ec08cb35d1073e61f268ba84e6babbb4618714689c20ba851bf38a4ed7a",
-  "hotpatch_rsa_sig": "LsRzo96wMF27wGE-GokXIXXPxT4xq85ivRO0IPinCPu5JJaOwNJx2uhmvJ7TiK1_ryaqXxipGprLpRsAWlPhDQQ39w5FD8QFjKsHPAee7BBjBcRgvB1JO5L11JVJ2319zK6Gjh3ouBJQ-vToEI-SzP8yzyN1LamqAPVb6BQqAMmJDERAWUdh90S2y-9F31-YLFMOyJLu7nCR-YRZbK7P4Dk45Yyr-aPFK2Bgus3Xl_eaTIgREAT_6hcZW5aVgwBeBNKArzBP7PUcP2H6PMRZggT74bxJB8ywgBuVMZLeY936VF3dzsgDGiqbpTYHNAIX4HTNtmkhGTz0ADp0sgRhoA",
-  "notes": "静默暗更新：历史已删暂存区(staging_trash)与缓存数据平滑迁移与撤销兼容优化"
+  "hotpatch_size_kb": 396.9,
+  "hotpatch_sha256": "085dac59cdf12b518c1a5bd136d4923918d556061753d233c20708486e4f2e2d",
+  "hotpatch_rsa_sig": "WUcHcnc7w-oIZbhY3KWVAFvUj-rWzRKw5_gYz2cpcePFHKPX62FTMPMg1QUYtj9dPnIodLZw83fHKA8MoOJwOiXOL_P1cCPmc2evmdgbaOBPyfEnzLD_BOwRoz1NzaIG2yPl92r5pKIDBOLeP3TZ_lxB7B2rowG9raXpc7mj-dip3S_QZ-qj2bzKAp1AUXNhQSLPkHvoicmER83vliXcKuWgxWacFj_J6kj3-OUBqL3oTu-1UW-7nSSNLg4viYckx9RXcYTIPtZsTEJZdxFCXvr0tn7-rtctY1USIsoj6DlcoyMi0lz9QxbX3WmUMeIh89b1_ACBsh1FD1E7QXQpIQ",
+  "notes": "企业级升级：支持命令行参数与 Windows 资源管理器右键快速查重"
 }
