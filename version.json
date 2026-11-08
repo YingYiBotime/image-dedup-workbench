@@ -1,15 +1,15 @@
 {
-  "version": "4.1.3",
-  "published_at": "2026-11-08 16:40:14",
+  "version": "4.1.4",
+  "published_at": "2026-11-08 17:09:28",
   "hotpatch_files": {
-    "app.py": "bad758bc5605af9fdda1d7868d940e79f1262edae45f810e532b7c949cc8c5e6",
-    "engine.py": "9d53f9681d146e2da83104497fbf8268738881d5861dbf992e12aac40f9dc77e",
-    "core_infra.py": "237d08419f91bcb6ea187a9ac9336d3855a58dd12d693972ac64cb96c77d99e0",
+    "app.py": "aa1274457afbe6f58369035adbf80b45807ee822f67f9a64336da54891bb9f1e",
+    "engine.py": "5e22fc6e8b1d96927f93c6de82b937158cf0a4c2a5464eafbd4ba976ac341ede",
+    "core_infra.py": "3b51c20c2bed5ae2af7d77cbd1a6e068d0df46ec7fb56ae598ef48854f3d69e9",
     "generate_icon.py": "bb64c9ce2ed9fffd5bc52f8bf64ccdd7dd8f0496ee0dfd42d64ace787edbf9db",
     "github_ota_config.json": "1dd58c6aae5ebb6933471858809869312d77d4d064f7f428820f5ea1410b2dab"
   },
-  "hotpatch_size_kb": 387.8,
-  "hotpatch_sha256": "b6b668d1bc6aebcb721b338a2b65af6bdbf3236fb351dd8f8e9693dfd0086d75",
-  "hotpatch_rsa_sig": "XHi0BCYwHsB3cfUwGjRcalA0n-INsTu0-a78gEWfvRdvPphmHx98k4_RDqo_maXGDN5i2wtHZa0lEZawGNah2UAcmAdaKJMgdKnliLELwdBT435wfyLXH966wZMIUeL3C1f_gU36lkztnJcPJXwLwaK3bcOkN2DuBT5D6uAzUuV9MXXGBdahjFqBABV-zwMHjTXN3iaLrRuhqtKmI4WW-6a84XZ9E7CceurHAJVMrzvjB7Xa70_uLvKpkOX2N9MAAYDBFzz_04IyGufuz0RHz63FxJVv5io1DRaROCWNXzIAaYkO42rAt2_OMtyYyg9mrEcAaITSL9cwoRqdbKcgyA",
-  "notes": "UI全面重构：升级为沉浸式自适应标题栏，更名为EVE_IDT，全面优化浅色模式UI效果"
+  "hotpatch_size_kb": 392.6,
+  "hotpatch_sha256": "222c3c959219ed47bb45d7e6c923c14f0fb0627ac5a6c3b0f2706e75cd28175c",
+  "hotpatch_rsa_sig": "bvhTXJ5MstveKZT7lIk8J-ZHPzYx5jCiYtN7q8gGXgi4s6ykE_TMujT5Id6nOU6GrePfjnApQnmcPBnhXBdjJtxZLyvwPBIXGWWrcyxE0wOn-J7veevhz69QxRj8jFOAYzcQnUlultI5XGsD2UQ8nHCFKYdbyVoKK3IpyCbaMWjiY7NcO4hY6YJ0lLjAFI4rrXikyZhUSuVugWWe7WKRvuP-Eh0Zx7hgbTewuKB6_P3U-y0bGJsa9QzrShCwQhAToGCdt0ikMdzJRhq09689v64Kfzn3hMOUSQ2Go3mxzq72Di3mRTOqp3pVDMhc99AaOS0GLylPqLVZ80qjWz2cVQ",
+  "notes": "修复应用更名为 EVE_IDT 后历史暂存区(staging_trash)与特征缓存的无感平滑迁移，增强撤销删除双路径兼容保障"
 }
